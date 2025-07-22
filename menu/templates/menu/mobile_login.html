@@ -1,0 +1,114 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Enter Mobile Number</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{% static 'menu/auth.css' %}" rel="stylesheet">
+    <style>
+        body {
+            background: #000;
+            color: #fff;
+            font-family: 'Montserrat', Arial, sans-serif;
+        }
+        .auth-container {
+            max-width: 350px;
+            margin: 40px auto;
+            background: transparent;
+            border-radius: 24px;
+            padding: 32px 20px 24px 20px;
+            text-align: center;
+        }
+        .food-img {
+            width: 140px;
+            height: 140px;
+            object-fit: cover;
+            border-radius: 50%;
+            background: #fff;
+            padding: 10px;
+            margin: 0 auto 18px auto;
+            display: block;
+            box-shadow: 0 2px 12px #000a;
+        }
+        .hotel-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            margin-bottom: 18px;
+            margin-top: 0;
+            font-family: 'Times New Roman', serif;
+        }
+        .welcome-text {
+            color: #fff;
+            font-size: 1rem;
+            margin-bottom: 18px;
+            margin-top: 0;
+        }
+        .form-label {
+            font-size: 1.05rem;
+            font-weight: 500;
+            color: #ff2222;
+            margin-bottom: 10px;
+        }
+        .input-group-text {
+            background: #fff;
+            color: #222;
+            border: none;
+            font-weight: 600;
+        }
+        .form-control {
+            background: #444;
+            color: #fff;
+            border: none;
+            border-radius: 0 8px 8px 0;
+        }
+        .form-control:focus {
+            background: #444;
+            color: #fff;
+            border: 1.5px solid #ffd700;
+            box-shadow: none;
+        }
+        .btn-success {
+            background: #00c48c;
+            border: none;
+            font-weight: 600;
+            border-radius: 12px;
+            font-size: 1.1rem;
+        }
+        .btn-success:hover {
+            background: #00e676;
+        }
+        @media (max-width: 500px) {
+            .auth-container {
+                max-width: 98vw;
+                padding: 18px 2vw 18px 2vw;
+            }
+            .food-img {
+                width: 90px;
+                height: 90px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="auth-container">
+    <img src="{% static 'menu/food.png' %}" class="food-img mb-3" alt="Food Image">
+    <div class="hotel-title">{{ hotel.name }}</div>
+    <div class="welcome-text">Welcome to digital online menu service</div>
+    <form method="post" class="auth-form">
+        {% csrf_token %}
+        <div class="form-label mb-2">Enter The Mobile Number</div>
+        <div class="input-group mb-4">
+            <span class="input-group-text" style="background:#fff;">
+                <img src="{% static 'menu/india-flag.png' %}" width="24" alt="IN">
+            </span>
+            <span class="input-group-text" style="background:#fff;">+ 91</span>
+            <input type="text" name="phone" class="form-control" placeholder="9885236970" maxlength="10" required pattern="\d{10}">
+        </div>
+        <button type="submit" class="btn btn-success w-100 mb-2">Get Otp</button>
+    </form>
+</div>
+</body>
+</html>
