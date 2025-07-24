@@ -55,36 +55,75 @@ def add_to_cart(request, qr_code, item_id):
     item = get_object_or_404(MenuItem, id=item_id)
     cart = request.session.get('cart', {})
     item_id_str = str(item_id)
+    image_url = item.image.url if item.image else ''
     if item_id_str in cart:
         cart[item_id_str]['quantity'] += 1
     else:
-        cart[item_id_str] = {'name': item.name, 'price': float(item.price), 'quantity': 1}
+        cart[item_id_str] = {
+            'name': item.name,
+            'price': float(item.price),
+            'quantity': 1,
+            'image': image_url,
+        }
     request.session['cart'] = cart
+    subtotal = sum(i['price'] * i['quantity'] for i in cart.values())
+    gst = round(subtotal * 0.05)
+    total = subtotal + gst
     cart_count = sum(i['quantity'] for i in cart.values())
     item_quantity = cart[item_id_str]['quantity']
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        return JsonResponse({'item_quantity': item_quantity, 'cart_count': cart_count})
-    return redirect('public_menu', qr_code=qr_code)
+        return JsonResponse({
+            'item_id': item_id_str,
+            'item_quantity': item_quantity,
+            'cart_count': cart_count,
+            'subtotal': int(subtotal),
+            'gst': int(gst),
+            'total': int(total),
+        })
+    return redirect('view_cart', qr_code=qr_code)
 
 def remove_from_cart(request, qr_code, item_id):
     cart = request.session.get('cart', {})
     item_id_str = str(item_id)
+    remove_all = request.POST.get('remove_all')
     if item_id_str in cart:
-        cart[item_id_str]['quantity'] -= 1
-        if cart[item_id_str]['quantity'] <= 0:
+        if remove_all:
             del cart[item_id_str]
+            item_quantity = 0
+        else:
+            cart[item_id_str]['quantity'] -= 1
+            if cart[item_id_str]['quantity'] <= 0:
+                del cart[item_id_str]
+                item_quantity = 0
+            else:
+                item_quantity = cart[item_id_str]['quantity']
+    else:
+        item_quantity = 0
     request.session['cart'] = cart
+    subtotal = sum(i['price'] * i['quantity'] for i in cart.values())
+    gst = round(subtotal * 0.05)
+    total = subtotal + gst
     cart_count = sum(i['quantity'] for i in cart.values())
-    item_quantity = cart.get(item_id_str, {}).get('quantity', 0)
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        return JsonResponse({'item_quantity': item_quantity, 'cart_count': cart_count})
-    return redirect('public_menu', qr_code=qr_code)
+        return JsonResponse({
+            'item_id': item_id_str,
+            'item_quantity': item_quantity,
+            'cart_count': cart_count,
+            'subtotal': int(subtotal),
+            'gst': int(gst),
+            'total': int(total),
+        })
+    return redirect('view_cart', qr_code=qr_code)
 
 def view_cart(request, qr_code):
     cart = request.session.get('cart', {})
-    total = sum(item['price'] * item['quantity'] for item in cart.values())
+    subtotal = sum(item['price'] * item['quantity'] for item in cart.values())
+    gst = round(subtotal * 0.05)  # 5% GST, adjust as needed
+    total = subtotal + gst
     return render(request, 'menu/cart.html', {
         'cart': cart,
-        'total': total,
+        'subtotal': int(subtotal),
+        'gst': int(gst),
+        'total': int(total),
         'qr_code': qr_code,
     })
