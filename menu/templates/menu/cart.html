@@ -7,42 +7,98 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="{% static 'menu/cart.css' %}" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
 <div class="cart-container">
-    <h3>Your Cart</h3>
+    <h3 class="cart-title">Your Cart</h3>
     {% if cart %}
-        <table class="table table-borderless align-middle">
-            <thead>
-                <tr>
-                    <th>Dish</th>
-                    <th>Price</th>
-                    <th>Qty</th>
-                    <th>Subtotal</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item_id, item in cart.items %}
-                <tr>
-                    <td>{{ item.name }}</td>
-                    <td>₹{{ item.price }}</td>
-                    <td>{{ item.quantity }}</td>
-                    <td>₹{{ item.price|floatformat:2|add:item.quantity|floatformat:2 }}</td>
-                    <td>
-                        <a href="{% url 'remove_from_cart' qr_code item_id %}" class="btn btn-sm btn-danger">Remove</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <div class="total-row">Total: ₹{{ total }}</div>
+        <div class="cart-list">
+            {% for item_id, item in cart.items %}
+            <div class="cart-item d-flex align-items-center mb-3">
+                <div class="flex-grow-1">
+                    <div class="cart-item-name">{{ item.name }}</div>
+                    <div class="cart-item-price">Rs.{{ item.price }}</div>
+                    <a href="#" class="btn btn-remove" data-id="{{ item_id }}">Remove</a>
+                </div>
+                <div class="cart-item-img-qty d-flex flex-column align-items-center ms-3">
+                    {% if item.image %}
+                        <img src="{{ item.image }}" style="width:60px;height:60px;object-fit:cover;border-radius:50%;border:2px solid #ffd700;" alt="{{ item.name }}">
+                    {% endif %}
+                    <div class="cart-qty-controls d-flex align-items-center">
+                        <button class="qty-btn minus-btn" data-id="{{ item_id }}">-</button>
+                        <span class="cart-qty mx-2" id="qty-{{ item_id }}">{{ item.quantity }}</span>
+                        <button class="qty-btn plus-btn" data-id="{{ item_id }}">+</button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="cart-summary mt-4">
+            <div class="d-flex justify-content-between">
+                <span>Sub total</span>
+                <span id="subtotal">Rs {{ subtotal }}</span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span>GST</span>
+                <span id="gst">Rs {{ gst }}</span>
+            </div>
+            <div class="d-flex justify-content-between cart-total">
+                <span>Total</span>
+                <span id="total">Rs {{ total }}</span>
+            </div>
+        </div>
+        <a href="#" class="btn btn-payment w-100 mt-3">Proceed to Payment</a>
     {% else %}
         <div class="empty-cart">
             <p>Your cart is empty.</p>
         </div>
     {% endif %}
-    <a href="{% url 'public_menu' qr_code %}" class="btn btn-secondary">Back to Menu</a>
+    <a href="{% url 'public_menu' qr_code %}" class="btn btn-secondary w-100 mt-2">Back to Menu</a>
 </div>
+
+<script>
+function updateCartDisplay(data) {
+    // Update quantity
+    if (data.item_id !== undefined) {
+        $('#qty-' + data.item_id).text(data.item_quantity);
+    }
+    // Update totals
+    $('#subtotal').text('Rs ' + data.subtotal);
+    $('#gst').text('Rs ' + data.gst);
+    $('#total').text('Rs ' + data.total);
+    // Remove item if quantity is 0
+    if (data.item_quantity === 0) {
+        $('#qty-' + data.item_id).closest('.cart-item').remove();
+        if ($('.cart-item').length === 0) {
+            $('.cart-list').html('<div class="empty-cart"><p>Your cart is empty.</p></div>');
+            $('.cart-summary, .btn-payment').hide();
+        }
+    }
+}
+
+$(document).on('click', '.plus-btn', function() {
+    const itemId = $(this).data('id');
+    $.post('/menu/{{ qr_code }}/add-to-cart/' + itemId + '/', { csrfmiddlewaretoken: '{{ csrf_token }}' }, function(data) {
+        updateCartDisplay(data);
+    });
+});
+
+$(document).on('click', '.minus-btn', function() {
+    const itemId = $(this).data('id');
+    $.post('/menu/{{ qr_code }}/remove-from-cart/' + itemId + '/', { csrfmiddlewaretoken: '{{ csrf_token }}' }, function(data) {
+        updateCartDisplay(data);
+    });
+});
+
+$(document).on('click', '.btn-remove', function(e) {
+    e.preventDefault();
+    const itemId = $(this).data('id');
+    // Remove all quantity
+    $.post('/menu/{{ qr_code }}/remove-from-cart/' + itemId + '/', { csrfmiddlewaretoken: '{{ csrf_token }}', remove_all: 1 }, function(data) {
+        updateCartDisplay(data);
+    });
+});
+</script>
 </body>
 </html>

@@ -13,6 +13,7 @@ body {
     display: block;
     box-shadow: 0 2px 12px #000a;
 }
+
 .hotel-title {
     text-align: center;
     font-size: 1.6rem;
@@ -154,3 +155,4 @@ body {
         height: 60px;
     }
 }
+
