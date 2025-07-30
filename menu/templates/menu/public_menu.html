@@ -3,153 +3,170 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>{{ hotel.name }} - E-Menu</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="{% static 'menu/menu.css' %}" rel="stylesheet">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <meta charset="UTF-8">
+  <title>{{ hotel.name }} - E-Menu</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="{% static 'menu/menu.css' %}" rel="stylesheet">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+  <style>
+    .track-order-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1050;
+      border-radius: 30px;
+      padding: 10px 20px;
+      font-weight: bold;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+  </style>
 </head>
 <body>
+
 <div class="container py-3">
-    {% if hotel.qr_image %}
-        <img src="{{ hotel.qr_image.url }}" class="brand-img" alt="Restaurant Logo">
-    {% endif %}
-    <div class="hotel-title">{{ hotel.name }}</div>
-    <div class="hotel-location">{{ hotel.location }}</div>
 
-    <!-- Category Buttons -->
-    <div class="d-flex justify-content-center gap-2 my-3 flex-wrap">
-        {% for category in categories %}
-            <button class="category-btn {% if forloop.first %}btn-primary active{% endif %}" onclick="showCategory('{{ category.id }}')" id="btn-category-{{ category.id }}">
-                {{ category.name }}
-            </button>
-        {% endfor %}
-    </div>
+  {% if hotel.qr_image %}
+    <img src="{% static 'menu/food.png' %}" class="brand-img" alt="Restaurant Logo">
+  {% endif %}
+  <div class="hotel-title">{{ hotel.name }}</div>
+  <div class="hotel-location">{{ hotel.location }}</div>
 
-    <!-- Category Sections -->
+  <!-- Category Buttons -->
+  <div class="d-flex justify-content-center gap-2 my-3 flex-wrap">
     {% for category in categories %}
-        <div id="category-{{ category.id }}" class="category-section {% if forloop.first %}active{% endif %}">
-            <h4 class="category-header">{{ category.name }}</h4>
-            <div class="row g-3">
-                {% for item in category.menuitem_set.all %}
-                    {% if item.available %}
-                        <div class="col-12">
-                            <div class="menu-item-card d-flex align-items-center p-3 mb-3">
-                                <div class="flex-grow-1">
-                                    <div class="item-title">{{ item.name }}</div>
-                                    <div class="item-desc">{{ item.description }}</div>
-                                    <div class="item-price">Rs.{{ item.price }}</div>
-                                </div>
-                                <div class="d-flex flex-column align-items-center ms-3">
-                                    {% if item.image %}
-                                        <img src="{{ item.image.url }}" alt="{{ item.name }}" class="item-img">
-                                    {% endif %}
-                                    <div id="cart-controls-{{ item.id }}" class="mt-2">
-                                        {% if cart_items|get_item:item.id %}
-                                            <div class="input-group input-group-sm">
-                                                <button class="btn btn-outline-secondary minus-btn" data-id="{{ item.id }}">-</button>
-                                                <span class="input-group-text">{{ cart_items|get_item:item.id }}</span>
-                                                <button class="btn btn-outline-secondary plus-btn" data-id="{{ item.id }}">+</button>
-                                            </div>
-                                        {% else %}
-                                            <button class="btn add-btn btn-sm mt-1" data-id="{{ item.id }}">Add</button>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    {% endif %}
-                {% endfor %}
-            </div>
-        </div>
+      <button class="category-btn {% if forloop.first %}btn-primary active{% endif %}" onclick="showCategory('{{ category.id }}')" id="btn-category-{{ category.id }}">
+        {{ category.name }}
+      </button>
     {% endfor %}
+  </div>
+
+  <!-- Category Sections -->
+  {% for category in categories %}
+    <div id="category-{{ category.id }}" class="category-section {% if forloop.first %}active{% endif %}">
+      <h4 class="category-header">{{ category.name }}</h4>
+      <div class="row g-3">
+        {% for item in category.menuitem_set.all %}
+          {% if item.available %}
+            <div class="col-12">
+              <div class="menu-item-card d-flex align-items-center p-3 mb-3">
+                <div class="flex-grow-1">
+                  <div class="item-title">{{ item.name }}</div>
+                  <div class="item-desc">{{ item.description }}</div>
+                  <div class="item-price">Rs.{{ item.price }}</div>
+                </div>
+                <div class="d-flex flex-column align-items-center ms-3">
+                  {% if item.image %}
+                    <img src="{{ item.image.url }}" alt="{{ item.name }}" class="item-img">
+                  {% endif %}
+                  <div id="cart-controls-{{ item.id }}" class="mt-2">
+                    {% if cart_items|get_item:item.id %}
+                      <div class="input-group input-group-sm">
+                        <button class="btn btn-outline-secondary minus-btn" data-id="{{ item.id }}">-</button>
+                        <span class="input-group-text">{{ cart_items|get_item:item.id }}</span>
+                        <button class="btn btn-outline-secondary plus-btn" data-id="{{ item.id }}">+</button>
+                      </div>
+                    {% else %}
+                      <button class="btn add-btn btn-sm mt-1" data-id="{{ item.id }}">Add</button>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+  {% endfor %}
 </div>
 
 <!-- Cart Notification Band -->
 <div id="cart-band" class="cart-band">
-    <span id="cart-band-msg"></span>
-    <a href="{% url 'view_cart' qr_code %}" id="view-cart-link" class="btn btn-light btn-sm ms-3">View Cart &gt;</a>
+  <span id="cart-band-msg"></span>
+  <a href="{% url 'view_cart' qr_code %}" id="view-cart-link" class="btn btn-light btn-sm ms-3">View Cart &gt;</a>
 </div>
+
+<!-- 🚚 Fixed Track Order Button (Bottom Right) -->
+{% if order_id %}
+  <a href="{% url 'track_order' qr_code=qr_code order_id=order_id %}" class="btn btn-warning track-order-btn">
+    🚚 Track Order
+  </a>
+{% endif %}
 
 <script>
 function showCategory(categoryId) {
-    document.querySelectorAll('.category-section').forEach(function(section) {
-        section.classList.remove('active');
-    });
-    document.getElementById('category-' + categoryId).classList.add('active');
-    document.querySelectorAll('.category-btn').forEach(function(btn) {
-        btn.classList.remove('btn-primary', 'active');
-    });
-    document.getElementById('btn-category-' + categoryId).classList.add('btn-primary', 'active');
+  document.querySelectorAll('.category-section').forEach(function(section) {
+    section.classList.remove('active');
+  });
+  document.getElementById('category-' + categoryId).classList.add('active');
+  document.querySelectorAll('.category-btn').forEach(function(btn) {
+    btn.classList.remove('btn-primary', 'active');
+  });
+  document.getElementById('btn-category-' + categoryId).classList.add('btn-primary', 'active');
 }
 
 function updateCartControls(itemId, quantity) {
-    let controls = '';
-    if (quantity > 0) {
-        controls = `
-            <div class="input-group input-group-sm">
-                <button class="btn btn-outline-secondary minus-btn" data-id="${itemId}">-</button>
-                <span class="input-group-text">${quantity}</span>
-                <button class="btn btn-outline-secondary plus-btn" data-id="${itemId}">+</button>
-            </div>
-        `;
-    } else {
-        controls = `<button class="btn add-btn btn-sm mt-1" data-id="${itemId}">Add</button>`;
-    }
-    $(`#cart-controls-${itemId}`).html(controls);
+  let controls = '';
+  if (quantity > 0) {
+    controls = `
+      <div class="input-group input-group-sm">
+        <button class="btn btn-outline-secondary minus-btn" data-id="${itemId}">-</button>
+        <span class="input-group-text">${quantity}</span>
+        <button class="btn btn-outline-secondary plus-btn" data-id="${itemId}">+</button>
+      </div>
+    `;
+  } else {
+    controls = `<button class="btn add-btn btn-sm mt-1" data-id="${itemId}">Add</button>`;
+  }
+  $(`#cart-controls-${itemId}`).html(controls);
 }
 
 function updateCartBand(count) {
-    if (count > 0) {
-        $('#cart-band-msg').text(`${count} item${count > 1 ? 's' : ''} in cart`);
-        $('#cart-band').addClass('show');
-    } else {
-        $('#cart-band').removeClass('show');
-    }
+  if (count > 0) {
+    $('#cart-band-msg').text(`${count} item${count > 1 ? 's' : ''} in cart`);
+    $('#cart-band').addClass('show');
+  } else {
+    $('#cart-band').removeClass('show');
+  }
 }
 
 var qr_code = "{{ qr_code }}";
 
-// On page load, show cart band if there are items in cart
 $(document).ready(function() {
-    var initialCount = 0;
-    {% for k, v in cart_items.items %}
-        initialCount += {{ v }};
-    {% endfor %}
-    updateCartBand(initialCount);
- });
-
-$(document).on('click', '.add-btn', function() {
-    const itemId = $(this).data('id');
-    $.post('/menu/' + qr_code + '/add-to-cart/' + itemId + '/', { csrfmiddlewaretoken: '{{ csrf_token }}' }, function(data) {
-        updateCartControls(itemId, data.item_quantity);
-        updateCartBand(data.cart_count);
-    });
+  var initialCount = 0;
+  {% for k, v in cart_items.items %}
+    initialCount += {{ v }};
+  {% endfor %}
+  updateCartBand(initialCount);
 });
 
-$(document).on('click', '.plus-btn', function() {
-    const itemId = $(this).data('id');
-    $.post('/menu/' + qr_code + '/add-to-cart/' + itemId + '/', { csrfmiddlewaretoken: '{{ csrf_token }}' }, function(data) {
-        updateCartControls(itemId, data.item_quantity);
-        updateCartBand(data.cart_count);
-    });
+$(document).on('click', '.add-btn, .plus-btn', function() {
+  const itemId = $(this).data('id');
+  $.post('/menu/' + qr_code + '/add-to-cart/' + itemId + '/', {
+    csrfmiddlewaretoken: '{{ csrf_token }}'
+  }, function(data) {
+    updateCartControls(itemId, data.item_quantity);
+    updateCartBand(data.cart_count);
+  });
 });
 
 $(document).on('click', '.minus-btn', function() {
-    const itemId = $(this).data('id');
-    $.post('/menu/' + qr_code + '/remove-from-cart/' + itemId + '/', { csrfmiddlewaretoken: '{{ csrf_token }}' }, function(data) {
-        updateCartControls(itemId, data.item_quantity);
-        updateCartBand(data.cart_count);
-    });
+  const itemId = $(this).data('id');
+  $.post('/menu/' + qr_code + '/remove-from-cart/' + itemId + '/', {
+    csrfmiddlewaretoken: '{{ csrf_token }}'
+  }, function(data) {
+    updateCartControls(itemId, data.item_quantity);
+    updateCartBand(data.cart_count);
+  });
 });
 
-// Optional: Make the whole band clickable (not just the button)
 $('#cart-band').on('click', function(e) {
-    if (!$(e.target).is('#view-cart-link')) {
-        window.location.href = $('#view-cart-link').attr('href');
-    }
+  if (!$(e.target).is('#view-cart-link')) {
+    window.location.href = $('#view-cart-link').attr('href');
+  }
 });
 </script>
+
 </body>
 </html>

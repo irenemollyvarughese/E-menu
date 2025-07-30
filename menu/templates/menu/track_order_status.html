@@ -1,0 +1,199 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Order Status</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'menu/truck_status.css' %}">
+  <style>
+    body {
+      background: #111;
+      color: #fff;
+      font-family: 'Segoe UI', sans-serif;
+    }
+
+    .status-wrapper {
+      max-width: 400px;
+      margin: 30px auto;
+    }
+
+    .status-card {
+      background: #1d1d1d;
+      border-radius: 20px;
+      padding: 25px;
+      box-shadow: 0 0 20px rgba(255, 165, 0, 0.4);
+    }
+
+    .truck-icon img {
+      width: 100px;
+      height: 100px;
+      object-fit: cover;
+      border-radius: 50%;
+      border: 3px solid #ffa726;
+      animation: bounceIcon 2s ease-in-out infinite;
+    }
+
+    @keyframes bounceIcon {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+
+    .text-orange {
+      color: #ffa726;
+    }
+
+    .order-summary .list-group-item {
+      background: #2a2a2a;
+      border: none;
+      color: #fff;
+      font-size: 0.92rem;
+      padding: 8px 12px;
+    }
+
+    .track-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      margin-top: 30px;
+    }
+
+    .track-step {
+      flex: 1;
+      text-align: center;
+      color: #aaa;
+      position: relative;
+    }
+
+    .track-step .dot {
+      width: 14px;
+      height: 14px;
+      margin: 0 auto 6px;
+      background: #666;
+      border-radius: 50%;
+      transition: background 0.3s;
+    }
+
+    .track-step.done .dot {
+      background-color: #4caf50;
+    }
+
+    .track-step .label {
+      font-size: 0.8rem;
+      color: #bbb;
+    }
+
+    .track-step.done .label {
+      color: #4caf50;
+    }
+
+    .track-line::before {
+      content: '';
+      position: absolute;
+      top: 7px;
+      left: 8px;
+      right: 8px;
+      height: 2px;
+      background: #444;
+      z-index: -1;
+    }
+
+    .btn-secondary {
+      background-color: #ffa726;
+      border: none;
+      color: #000;
+      font-weight: 600;
+    }
+
+    .btn-secondary:hover {
+      background-color: #ff9800;
+    }
+
+    .completed-btn {
+      background-color: #4caf50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin-top: 20px;
+      border-radius: 8px;
+      font-weight: bold;
+    }
+
+    @media (max-width: 500px) {
+      .status-wrapper {
+        max-width: 90%;
+        padding: 0 10px;
+      }
+
+      .order-summary .list-group-item {
+        font-size: 0.85rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="status-wrapper">
+    <div class="status-card" id="tracker">
+
+      <!-- Circular Restaurant Image -->
+      <div class="truck-icon text-center mb-3">
+        <img src="{% static 'menu/food.png' %}" alt="Restaurant Icon">
+        <h4 class="text-orange mt-2">Order #{{ order.id }}</h4>
+      </div>
+
+      <!-- Order Details -->
+      <div class="order-summary mb-4">
+        <ul class="list-group">
+          <li class="list-group-item">🏨 Hotel: {{ order.hotel.name }}</li>
+          <li class="list-group-item">👥 Guests: {{ order.guest_count }}</li>
+          <li class="list-group-item">💳 Payment: {{ order.get_payment_method_display }}</li>
+          <li class="list-group-item">Subtotal: ₹{{ order.subtotal }}</li>
+          <li class="list-group-item">GST: ₹{{ order.gst }}</li>
+          <li class="list-group-item">Total: ₹{{ order.total_amount }}</li>
+        </ul>
+      </div>
+
+      <!-- Status Steps -->
+      <div class="track-line mb-3">
+        {% for step in steps %}
+          <div class="track-step {% if step == order.status or step in order.status_path %}done{% endif %}">
+            <div class="dot"></div>
+            <div class="label">{{ step }}</div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <!-- Order Completed Badge -->
+      {% if order.status == "Served" %}
+        <div class="text-center">
+          <button class="completed-btn">✔️ Order Completed</button>
+        </div>
+      {% endif %}
+
+      <!-- Back to Menu Button -->
+      <a href="{% url 'public_menu' qr_code %}" class="btn btn-secondary w-100 mt-3">
+       Back to Menu
+      </a>
+
+    </div>
+  </div>
+
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
