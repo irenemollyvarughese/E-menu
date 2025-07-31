@@ -45,3 +45,60 @@ class MenuItem(models.Model):
 
     def __str__(self):
         return f"{self.name} - ₹{self.price}"
+    
+
+
+
+
+
+
+# adding payment(oder)
+
+
+
+STATUS_CHOICES = [
+           ('New', 'New'),
+            ('Preparing', 'Preparing'),
+            ('Ready', 'Ready'),
+            ('Served', 'Served')
+]
+
+class Order(models.Model):
+    hotel = models.ForeignKey(Hotel, on_delete=models.CASCADE)
+    guest_count = models.PositiveIntegerField(default=1)
+    payment_method = models.CharField(max_length=10, choices=[('COD', 'Cash'), ('ONLINE', 'Online')])
+    status = models.CharField(max_length=20, default='New')
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2,default=0.00)
+    gst = models.DecimalField(max_digits=10, decimal_places=2,default=0.00)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2,default=0.00)
+    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='New')
+
+    
+    def __str__(self):
+        return f"Order #{self.id} - {self.status}"
+    
+
+    @property
+    def status_path(self):
+        """
+        Returns all statuses leading up to the current one.
+        Useful for UI progress indicators.
+        """
+        flow = [choice[0] for choice in STATUS_CHOICES]
+        if self.status in flow:
+            idx = flow.index(self.status)
+            return flow[:idx]
+        return []
+    
+    
+
+
+class OrderItem(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
+    menu_item = models.ForeignKey(MenuItem, on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField()
+    price = models.DecimalField(max_digits=8, decimal_places=2)
+
+
+

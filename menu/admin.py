@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Hotel, Category, MenuItem
+from .models import *
 
 # Show Category inline inside Hotel admin
 class CategoryInline(admin.TabularInline):
@@ -34,3 +34,30 @@ class MenuItemAdmin(admin.ModelAdmin):
     list_filter = ['category', 'available']
     search_fields = ['name', 'description']
 
+
+
+
+# new adding
+
+
+
+# ---------------- Order & OrderItem Setup ----------------
+class OrderItemInline(admin.TabularInline):
+    model = OrderItem
+    extra = 0
+    readonly_fields = ['menu_item', 'quantity', 'price']
+    can_delete = False
+
+@admin.register(Order)
+class OrderAdmin(admin.ModelAdmin):
+    list_display = ['id', 'hotel', 'guest_count', 'payment_method', 'total_amount', 'created_at']
+    list_filter = ['hotel', 'payment_method', 'created_at']
+    date_hierarchy = 'created_at'
+    inlines = [OrderItemInline]
+    search_fields = ['id', 'hotel__name']
+
+@admin.register(OrderItem)
+class OrderItemAdmin(admin.ModelAdmin):
+    list_display = ['order', 'menu_item', 'quantity', 'price']
+    list_filter = ['menu_item']
+    search_fields = ['order__id', 'menu_item__name']
