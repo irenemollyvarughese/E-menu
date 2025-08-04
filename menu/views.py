@@ -220,3 +220,187 @@ def track_order_view(request, qr_code, order_id):
     })
 
 
+from django.contrib.admin.views.decorators import staff_member_required
+from django.shortcuts import render, get_object_or_404, redirect
+from .models import Order
+
+@staff_member_required
+def staff_orders(request):
+    # Define which statuses are active and which are completed
+    active_statuses = ['New', 'Preparing', 'Ready']
+    completed_statuses = ['Served']
+    orders_active = Order.objects.filter(status__in=active_statuses).order_by('-created_at')
+    orders_completed = Order.objects.filter(status__in=completed_statuses).order_by('-created_at')
+    status_choices = ['New', 'Preparing', 'Ready', 'Served']
+    return render(request, 'menu/staff_orders.html', {
+        'orders_active': orders_active,
+        'orders_completed': orders_completed,
+        'status_choices': status_choices,
+    })
+
+@staff_member_required
+def update_order_status(request, order_id):
+    order = get_object_or_404(Order, id=order_id)
+    if request.method == 'POST':
+        new_status = request.POST.get('status')
+        if new_status in ['New', 'Preparing', 'Ready', 'Served']:
+            order.status = new_status
+            order.save()
+    return redirect('staff_orders')
+
+
+from django.contrib.auth import authenticate, login, logout
+from django.shortcuts import render, redirect
+from django.contrib import messages
+
+def admin_login(request):
+    if request.user.is_authenticated:
+        return redirect('admin_dashboard')  # or wherever your dashboard is
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        user = authenticate(request, username=username, password=password)
+        if user is not None and user.is_staff:
+            login(request, user)
+            return redirect('admin_dashboard')
+        else:
+            messages.error(request, "Invalid credentials or not an admin user.")
+    return render(request, 'menu/admin_login.html')
+
+def admin_logout(request):
+    logout(request)
+    return redirect('admin_login')
+
+
+def admin_dashboard(request):
+    # You can add context as needed
+    return render(request, 'menu/admin_dashboard.html')
+
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect
+
+
+@login_required
+def admin_settings(request):
+    # Replace with your real logic
+    return render(request, 'menu/admin_settings.html')
+
+def admin_logout(request):
+    from django.contrib.auth import logout
+    logout(request)
+    return redirect('admin_login')
+
+
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, get_object_or_404, redirect
+from .models import MenuItem
+from .forms import MenuItemForm
+
+@login_required
+def menu_items(request):
+    items = MenuItem.objects.all()
+    return render(request, 'menu/menu_items.html', {'items': items})
+
+@login_required
+def add_menu_item(request):
+    if request.method == 'POST':
+        form = MenuItemForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            return redirect('menu_items')
+    else:
+        form = MenuItemForm()
+    return render(request, 'menu/add_menu_item.html', {'form': form})
+
+@login_required
+def edit_menu_item(request, item_id):
+    item = get_object_or_404(MenuItem, id=item_id)
+    if request.method == 'POST':
+        form = MenuItemForm(request.POST, request.FILES, instance=item)
+        if form.is_valid():
+            form.save()
+            return redirect('menu_items')
+    else:
+        form = MenuItemForm(instance=item)
+    return render(request, 'menu/edit_menu_item.html', {'form': form, 'item': item})
+
+@login_required
+def delete_menu_item(request, item_id):
+    item = get_object_or_404(MenuItem, id=item_id)
+    if request.method == 'POST':
+        item.delete()
+        return redirect('menu_items')
+    return render(request, 'menu/delete_menu_item.html', {'item': item})
+
+
+from .models import Category
+from .forms import CategoryForm
+
+@login_required
+def menu_categories(request):
+    categories = Category.objects.all()
+    return render(request, 'menu/menu_categories.html', {'categories': categories})
+
+@login_required
+def add_category(request):
+    if request.method == 'POST':
+        form = CategoryForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('menu_categories')
+    else:
+        form = CategoryForm()
+    return render(request, 'menu/add_category.html', {'form': form})
+
+@login_required
+def edit_category(request, cat_id):
+    category = get_object_or_404(Category, id=cat_id)
+    if request.method == 'POST':
+        form = CategoryForm(request.POST, instance=category)
+        if form.is_valid():
+            form.save()
+            return redirect('menu_categories')
+    else:
+        form = CategoryForm(instance=category)
+    return render(request, 'menu/edit_category.html', {'form': form, 'category': category})
+
+@login_required
+def delete_category(request, cat_id):
+    category = get_object_or_404(Category, id=cat_id)
+    if request.method == 'POST':
+        category.delete()
+        return redirect('menu_categories')
+    return render(request, 'menu/delete_category.html', {'category': category})
+
+
+
+import cohere
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+import json
+
+@csrf_exempt
+@login_required
+def ai_generate_description(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        name = data.get('name', '')
+        category = data.get('category', '')
+        prompt = f"Write a delicious, enticing menu description for a dish called '{name}'"
+        if category:
+            prompt += f" in the category '{category}'"
+        prompt += ". Make it sound appetizing and unique."
+        co = cohere.Client("7V1TXcGKbgtUGkK77L8Qks0py1FvYo7itNYlsubl")
+        try:
+            response = co.generate(
+                model="command",
+                prompt=prompt,
+                max_tokens=60,
+                temperature=0.7,
+            )
+            description = response.generations[0].text.strip()
+        except Exception as e:
+            description = f"AI description not available (error: {str(e)})"
+        return JsonResponse({"description": description})
+    return JsonResponse({"error": "Invalid request"}, status=400)
