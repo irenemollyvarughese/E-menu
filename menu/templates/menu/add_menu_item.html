@@ -1,0 +1,136 @@
+{% extends 'menu/admin_base.html' %}
+{% load form_extras %}
+{% block content %}
+<div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="card shadow-lg border-0" style="background: #23272f; border-radius: 22px; min-width: 370px; max-width: 480px; width: 100%;">
+        <div class="card-body p-4">
+            <h2 class="mb-4 text-center" style="color: #ffd700; letter-spacing: 1px; font-weight: 700;">Add Menu Item</h2>
+            <form method="post" enctype="multipart/form-data" autocomplete="off" id="menu-item-form">
+                {% csrf_token %}
+                {% for field in form %}
+                    <div class="mb-3">
+                        <label class="form-label" style="color:#ffd700; font-weight:600;">{{ field.label }}</label>
+                        <div class="input-group">
+                            {% if field.name == "description" %}
+                                {{ field|add_class:"custom-dark-input" }}
+                                <button type="button" class="btn btn-outline-info" id="ai-desc-btn" style="margin-left:10px; font-weight:600;">AI Generate</button>
+                            {% else %}
+                                {{ field|add_class:"custom-dark-input" }}
+                            {% endif %}
+                        </div>
+                        {% if field.help_text %}
+                            <div class="form-text text-muted">{{ field.help_text }}</div>
+                        {% endif %}
+                        {% for error in field.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+                <div class="d-flex justify-content-between mt-4">
+                    <button type="submit" class="btn btn-success px-4 py-2 shadow-sm" style="font-size:1.1rem;">Add Item</button>
+                    <a href="{% url 'menu_items' %}" class="btn btn-outline-light px-4 py-2" style="font-size:1.1rem;">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<style>
+    .custom-dark-input,
+    .custom-dark-input:focus {
+        background: #181c22 !important;
+        color: #fff !important;
+        border: 1.5px solid #444 !important;
+        border-radius: 10px !important;
+        font-size: 1.08rem !important;
+        padding: 10px 14px !important;
+        box-shadow: none !important;
+        width: 100% !important;
+        margin-top: 2px;
+    }
+    .custom-dark-input:focus {
+        border: 1.5px solid #ffd700 !important;
+        box-shadow: 0 0 0 2px #ffd70033 !important;
+    }
+    .btn-success {
+        background: linear-gradient(90deg, #00c48c 60%, #00e676 100%);
+        border: none;
+        font-weight: 700;
+        border-radius: 12px;
+        letter-spacing: 0.5px;
+        box-shadow: 0 2px 8px #00c48c33;
+    }
+    .btn-success:hover {
+        background: linear-gradient(90deg, #00e676 60%, #00c48c 100%);
+        color: #181818;
+    }
+    .btn-outline-light {
+        border-radius: 12px;
+        font-weight: 700;
+        border: 1.5px solid #fff;
+        color: #fff;
+        background: transparent;
+        letter-spacing: 0.5px;
+    }
+    .btn-outline-light:hover {
+        background: #ffd700;
+        color: #181818;
+        border: 1.5px solid #ffd700;
+    }
+    .btn-outline-info {
+        border-radius: 10px;
+        font-weight: 600;
+        border: 1.5px solid #00c48c;
+        color: #00c48c;
+        background: transparent;
+        transition: background 0.2s, color 0.2s;
+    }
+    .btn-outline-info:hover {
+        background: #00c48c;
+        color: #fff;
+        border: 1.5px solid #00c48c;
+    }
+    .card {
+        box-shadow: 0 8px 32px #000a, 0 1.5px 8px #ffd70022;
+    }
+    .form-label {
+        font-size: 1.08rem;
+        margin-bottom: 6px;
+    }
+</style>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const aiBtn = document.getElementById('ai-desc-btn');
+    if (aiBtn) {
+        aiBtn.onclick = function() {
+            const name = document.getElementById('id_name').value;
+            const category = document.getElementById('id_category') ? document.getElementById('id_category').value : '';
+            if (!name) {
+                alert("Please enter the dish name first!");
+                return;
+            }
+            aiBtn.disabled = true;
+            aiBtn.innerText = "Generating...";
+            fetch("{% url 'ai_generate_description' %}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": "{{ csrf_token }}"
+                },
+                body: JSON.stringify({name: name, category: category})
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('id_description').value = data.description;
+                aiBtn.disabled = false;
+                aiBtn.innerText = "AI Generate";
+            })
+            .catch(() => {
+                alert("Failed to generate description.");
+                aiBtn.disabled = false;
+                aiBtn.innerText = "AI Generate";
+            });
+        };
+    }
+});
+</script>
+{% endblock %}

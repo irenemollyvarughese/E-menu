@@ -1,0 +1,143 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Orders Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #111; color: #fff; }
+        .order-card { background: #181818; border-radius: 16px; margin-bottom: 24px; padding: 18px; }
+        .order-status { font-weight: bold; }
+        .order-items-table {
+            background: #222;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .order-items-table th, .order-items-table td {
+            color: #fff !important;
+            background: #222 !important;
+            border-color: #333 !important;
+        }
+        .order-items-table tr {
+            border-bottom: 1px solid #333 !important;
+        }
+        .order-items-table thead th {
+            background: #181818 !important;
+            color: #ffd700 !important;
+            border-bottom: 2px solid #ffd700 !important;
+        }
+        .status-btn { margin-right: 8px; }
+    </style>
+</head>
+<body>
+<div class="container py-4">
+    <h2 class="mb-4">Active Orders</h2>
+    {% for order in orders_active %}
+        <div class="order-card">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                    <span class="me-3">Order #{{ order.id }}</span>
+                    <span>Table: {{ order.table_number }}</span>
+                    <span class="ms-3">Phone: {{ order.phone }}</span>
+                </div>
+                <span class="order-status">{{ order.status }}</span>
+            </div>
+            <div>Placed at: {{ order.created_at|date:"Y-m-d H:i" }}</div>
+            <p>order.items.count: {{ order.items.count }}</p>
+            <table class="table table-sm order-items-table mt-3">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Qty</th>
+                        <th>Price</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order.items.all %}
+                        <tr>
+                            <td>{{ item.menu_item.name }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>Rs.{{ item.price }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted">No items</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <form method="post" action="{% url 'update_order_status' order.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <select name="status" class="form-select d-inline w-auto" style="display:inline-block;">
+                            {% for s in status_choices %}
+                                <option value="{{ s }}" {% if order.status == s %}selected{% endif %}>{{ s }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-warning status-btn">Update</button>
+                    </form>
+                </div>
+                <div class="fw-bold fs-5">Total: Rs.{{ order.total_amount }}</div>
+            </div>
+        </div>
+    {% empty %}
+        <div class="alert alert-info">No active orders.</div>
+    {% endfor %}
+
+    <h2 class="mb-4 mt-5">Completed Orders</h2>
+    {% for order in orders_completed %}
+        <div class="order-card">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                    <span class="me-3">Order #{{ order.id }}</span>
+                    <span>Table: {{ order.table_number }}</span>
+                    <span class="ms-3">Phone: {{ order.phone }}</span>
+                </div>
+                <span class="order-status">{{ order.status }}</span>
+            </div>
+            <div>Placed at: {{ order.created_at|date:"Y-m-d H:i" }}</div>
+            <p>order.items.count: {{ order.items.count }}</p>
+            <table class="table table-sm order-items-table mt-3">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Qty</th>
+                        <th>Price</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order.items.all %}
+                        <tr>
+                            <td>{{ item.menu_item.name }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>Rs.{{ item.price }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted">No items</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <form method="post" action="{% url 'update_order_status' order.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <select name="status" class="form-select d-inline w-auto" style="display:inline-block;">
+                            {% for s in status_choices %}
+                                <option value="{{ s }}" {% if order.status == s %}selected{% endif %}>{{ s }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-warning status-btn">Update</button>
+                    </form>
+                </div>
+                <div class="fw-bold fs-5">Total: Rs.{{ order.total_amount }}</div>
+            </div>
+        </div>
+    {% empty %}
+        <div class="alert alert-info">No completed orders.</div>
+    {% endfor %}
+</div>
+</body>
+</html>

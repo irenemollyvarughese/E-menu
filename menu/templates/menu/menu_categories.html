@@ -1,0 +1,30 @@
+{% extends 'menu/admin_base.html' %}
+{% block content %}
+<h2>Categories</h2>
+<a href="{% url 'add_category' %}" class="btn btn-success mb-3">+ Add Category</a>
+<table class="table table-dark table-striped">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Hotel</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for category in categories %}
+        <tr>
+            <td>{{ category.name }}</td>
+            <td>{{ category.hotel.name }}</td>
+            <td>
+                <a href="{% url 'edit_category' category.id %}" class="btn btn-sm btn-warning">Edit</a>
+                <a href="{% url 'delete_category' category.id %}" class="btn btn-sm btn-danger">Delete</a>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="3" class="text-center text-muted">No categories found.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
