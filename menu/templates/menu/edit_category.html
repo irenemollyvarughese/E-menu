@@ -1,10 +1,75 @@
+
+
+
+
 {% extends 'menu/admin_base.html' %}
+{% load widget_tweaks %}
+
 {% block content %}
-<h2>Edit Category: {{ category.name }}</h2>
-<form method="post" class="mt-3">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit" class="btn btn-primary">Save Changes</button>
-    <a href="{% url 'menu_categories' %}" class="btn btn-secondary">Cancel</a>
-</form>
+<div class="container py-5">
+    <div class="card shadow-lg p-4" style="background-color: #242635; border-radius: 20px; max-width: 600px; margin: 0 auto;">
+        <h3 class="text-center fw-bold mb-4" style="color: #f1c40f;">➕ Add New Category</h3>
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            {% for field in form %}
+                <div class="mb-3">
+                    <label class="form-label text-light">{{ field.label }}</label>
+                    {{ field|add_class:"form-control bg-dark text-white border-0 shadow-sm" }}
+                    {% if field.errors %}
+                        <div class="text-danger small mt-1">{{ field.errors|striptags }}</div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+
+            <div class="d-flex justify-content-end mt-4">
+                <a href="{% url 'menu_categories' %}" class="btn btn-outline-light me-2 rounded-pill px-4">Cancel</a>
+                <button type="submit" class="btn btn-warning rounded-pill px-4">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background-color: #121212;
+        color: #e0e0e0;
+        font-family: 'Segoe UI', sans-serif;
+    }
+
+    .form-label {
+        font-weight: 500;
+    }
+
+    .form-control {
+        background-color: #1c1c28;
+        color: #ffffff;
+        border-radius: 10px;
+        padding: 0.6rem 0.75rem;
+        border: 1px solid #3a3a4a;
+    }
+
+    .form-control:focus {
+        border-color: #f1c40f;
+        box-shadow: 0 0 0 0.2rem rgba(241, 196, 15, 0.25);
+    }
+
+    .btn-outline-light:hover {
+        background-color: #ffffff;
+        color: #000;
+    }
+
+    .btn-warning:hover {
+        background-color: #e0ac00;
+        border-color: #e0ac00;
+        color: #000;
+    }
+
+    .card {
+        backdrop-filter: blur(6px);
+    }
+</style>
 {% endblock %}
