@@ -1,10 +1,166 @@
 {% extends 'menu/admin_base.html' %}
+{% load static %}
+{% load form_extras %}
+
 {% block content %}
-<h2>Edit Menu Item: {{ item.name }}</h2>
-<form method="post" enctype="multipart/form-data" class="mt-3">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit" class="btn btn-primary">Save Changes</button>
-    <a href="{% url 'menu_items' %}" class="btn btn-secondary">Cancel</a>
-</form>
+<div class="container my-5">
+    <div class="card p-4 bg-dark text-light" style="border-radius: 22px; max-width: 650px; margin: auto;">
+        
+        <h3 class="mb-4" style="color:  #ffd700;">
+            Edit Menu Item 
+            <small class="text-white">({{ form.instance.name }})</small>
+        </h3>
+
+       
+
+        <form method="post" enctype="multipart/form-data" novalidate>
+            {% csrf_token %}
+            {% for field in form %}
+                <div class="mb-3" style="color:  #ffd700;">
+                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+
+                    {% if field.name == "image" and field.value %}
+                        <div class="mb-2">
+                            <label class="form-label">Current Image:</label><br>
+                            <img src="{{ field.value.url }}" alt="Current Image" class="img-thumbnail mb-2" style="max-height: 180px; border-radius: 10px;">
+                        </div>
+                    {% endif %}
+
+                    {{ field|add_class:"custom-dark-input" }}
+
+                    {% if field.name == "description" %}
+                        <div class="text-end mt-1">
+                            <button type="button" id="ai-desc-btn" class="btn btn-outline-info btn-sm">AI Generate</button>
+                        </div>
+                    {% endif %}
+
+                    {% if field.errors %}
+                        <div class="text-danger small mt-1">{{ field.errors }}</div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+
+            <div class="d-flex justify-content-between mt-4">
+                <button type="submit" class="btn btn-success px-4">Save Changes</button>
+                <a href="{% url 'menu_items' %}" class="btn btn-outline-light">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .custom-dark-input,
+    .custom-dark-input:focus {
+        background: #181c22 !important;
+        color: #fff !important;
+        border: 1.5px solid #444 !important;
+        border-radius: 10px !important;
+        font-size: 1.08rem !important;
+        padding: 10px 14px !important;
+        box-shadow: none !important;
+        width: 100% !important;
+        margin-top: 2px;
+    }
+
+    .custom-dark-input:focus {
+        border: 1.5px solid #ffd700 !important;
+        box-shadow: 0 0 0 2px #ffd70033 !important;
+    }
+
+    .btn-success {
+        background: linear-gradient(90deg, #00c48c 60%, #00e676 100%);
+        border: none;
+        font-weight: 700;
+        border-radius: 12px;
+        letter-spacing: 0.5px;
+        box-shadow: 0 2px 8px #00c48c33;
+    }
+
+    .btn-success:hover {
+        background: linear-gradient(90deg, #00e676 60%, #00c48c 100%);
+        color: #181818;
+    }
+
+    .btn-outline-light {
+        border-radius: 12px;
+        font-weight: 700;
+        border: 1.5px solid #ffd700;
+        color: #ffd700;
+        background: transparent;
+        letter-spacing: 0.5px;
+    }
+
+    .btn-outline-light:hover {
+        background: #ffd700;
+        color: #181818;
+        border: 1.5px solid #ffd700;
+    }
+
+    .btn-outline-info {
+        border-radius: 10px;
+        font-weight: 600;
+        border: 1.5px solid #00c48c;
+        color: #00c48c;
+        background: transparent;
+        transition: background 0.2s, color 0.2s;
+    }
+
+    .btn-outline-info:hover {
+        background: #00c48c;
+        color: #fff;
+        border: 1.5px solid #00c48c;
+    }
+
+    .card {
+        box-shadow: 0 8px 32px #000a, 0 1.5px 8px #ffd70022;
+    }
+
+    .form-label {
+        font-size: 1.08rem;
+        margin-bottom: 6px;
+    }
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const aiBtn = document.getElementById('ai-desc-btn');
+    if (aiBtn) {
+        aiBtn.onclick = function() {
+            const name = document.getElementById('id_name')?.value.trim();
+            const category = document.getElementById('id_category')?.value || '';
+
+            if (!name) {
+                alert("Please enter the dish name first!");
+                return;
+            }
+
+            aiBtn.disabled = true;
+            aiBtn.innerText = "Generating...";
+
+            fetch("{% url 'ai_generate_description' %}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": "{{ csrf_token }}"
+                },
+                body: JSON.stringify({ name: name, category: category })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const descField = document.getElementById('id_description');
+                if (descField && data.description) {
+                    descField.value = data.description;
+                }
+            })
+            .catch(() => {
+                alert("Failed to generate description.");
+            })
+            .finally(() => {
+                aiBtn.disabled = false;
+                aiBtn.innerText = "AI Generate";
+            });
+        };
+    }
+});
+</script>
 {% endblock %}

@@ -17,3 +17,13 @@ class CategoryForm(forms.ModelForm):
     class Meta:
         model = Category
         fields = ['hotel', 'name']
+
+        widgets = {
+            'name': forms.TextInput(attrs={
+                'class': 'form-control bg-dark text-white border-0 shadow-sm'
+            }),
+            'description': forms.Textarea(attrs={
+                'class': 'form-control bg-dark text-white border-0 shadow-sm',
+                'rows': 3
+            }),
+        }
