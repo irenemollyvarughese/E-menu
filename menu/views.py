@@ -404,3 +404,60 @@ def ai_generate_description(request):
             description = f"AI description not available (error: {str(e)})"
         return JsonResponse({"description": description})
     return JsonResponse({"error": "Invalid request"}, status=400)
+
+
+
+import requests
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+import json
+import base64
+
+@csrf_exempt
+@login_required
+def ai_generate_image(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        name = data.get('name', '')
+        description = data.get('description', '')
+        prompt = f"High quality food photo of {name}. {description}"
+        HF_TOKEN = "YOUR_HUGGINGFACE_TOKEN"
+        API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2"
+        headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+        payload = {"inputs": prompt}
+        response = requests.post(API_URL, headers=headers, json=payload)
+        if response.status_code == 200 and response.headers.get("content-type", "").startswith("image/"):
+            # Save image to media folder or serve as base64
+            image_data = base64.b64encode(response.content).decode("utf-8")
+            image_url = f"data:image/png;base64,{image_data}"
+            return JsonResponse({"image_url": image_url})
+        else:
+            return JsonResponse({"error": "Failed to generate image."})
+    return JsonResponse({"error": "Invalid request"}, status=400)
+
+
+
+
+
+import requests
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+import json
+
+@csrf_exempt
+@login_required
+def ai_generate_image(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        prompt = data.get('prompt') or f"A high quality food photo of {data.get('name', '')}"
+
+        # Pollinations API endpoint
+        api_url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}"
+
+        # The API returns the image directly, so we just return the URL
+        image_url = api_url
+
+        return JsonResponse({"image_url": image_url})
+    return JsonResponse({"error": "Invalid request"}, status=400)
