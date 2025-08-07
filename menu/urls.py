@@ -38,5 +38,5 @@ urlpatterns = [
     path('staff/menu/categories/<int:cat_id>/delete/', views.delete_category, name='delete_category'),
 
     path('staff/menu/items/ai-generate-description/', views.ai_generate_description, name='ai_generate_description'),
-
+    path('staff/menu/items/ai-generate-image/', views.ai_generate_image, name='ai_generate_image'),
 ]

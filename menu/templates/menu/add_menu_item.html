@@ -14,10 +14,16 @@
                             {% if field.name == "description" %}
                                 {{ field|add_class:"custom-dark-input" }}
                                 <button type="button" class="btn btn-outline-info" id="ai-desc-btn" style="margin-left:10px; font-weight:600;">AI Generate</button>
+                            {% elif field.name == "image" %}
+                                {{ field|add_class:"custom-dark-input" }}
+                                <button type="button" class="btn btn-outline-info" id="ai-img-btn" style="margin-left:10px; font-weight:600;">AI Generate Image</button>
                             {% else %}
                                 {{ field|add_class:"custom-dark-input" }}
                             {% endif %}
                         </div>
+                        {% if field.name == "image" %}
+                            <div id="ai-img-preview" class="mt-3"></div>
+                        {% endif %}
                         {% if field.help_text %}
                             <div class="form-text text-muted">{{ field.help_text }}</div>
                         {% endif %}
@@ -34,6 +40,32 @@
         </div>
     </div>
 </div>
+
+<!-- AI Image Modal -->
+<div class="modal fade" id="aiImageModal" tabindex="-1" aria-labelledby="aiImageModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content" style="background:#23272f; color:#fff;">
+      <div class="modal-header">
+        <h5 class="modal-title" id="aiImageModalLabel" style="color:#ffd700;">AI Image Generator</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body d-flex flex-wrap gap-4">
+        <div class="flex-grow-1" style="min-width:250px;">
+          <label for="ai-img-prompt" class="form-label" style="color:#ffd700;">Prompt</label>
+          <textarea id="ai-img-prompt" class="form-control custom-dark-input" rows="4"></textarea>
+          <button type="button" class="btn btn-outline-info mt-3" id="ai-img-generate-btn">Regenerate</button>
+        </div>
+        <div class="flex-grow-1 d-flex flex-column align-items-center" style="min-width:250px;">
+          <div id="ai-img-modal-preview" class="mb-2" style="min-height:200px;display:flex;align-items:center;justify-content:center;">
+            <span class="text-muted">No image yet</span>
+          </div>
+          <button type="button" class="btn btn-success" id="ai-img-use-btn" style="display:none;">Use this image</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <style>
     .custom-dark-input,
     .custom-dark-input:focus {
@@ -97,8 +129,10 @@
         margin-bottom: 6px;
     }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
+    // AI Description
     const aiBtn = document.getElementById('ai-desc-btn');
     if (aiBtn) {
         aiBtn.onclick = function() {
@@ -131,6 +165,82 @@ document.addEventListener("DOMContentLoaded", function() {
             });
         };
     }
+
+    // AI Image Modal logic
+    const aiImgBtn = document.getElementById('ai-img-btn');
+    const aiImgModal = new bootstrap.Modal(document.getElementById('aiImageModal'));
+    const aiImgPrompt = document.getElementById('ai-img-prompt');
+    const aiImgGenerateBtn = document.getElementById('ai-img-generate-btn');
+    const aiImgModalPreview = document.getElementById('ai-img-modal-preview');
+    const aiImgUseBtn = document.getElementById('ai-img-use-btn');
+    const aiImgPreview = document.getElementById('ai-img-preview');
+    let currentImageUrl = "";
+
+    if (aiImgBtn) {
+        aiImgBtn.onclick = function() {
+            const name = document.getElementById('id_name').value;
+            aiImgPrompt.value = name ? `A high quality food photo of ${name}` : "";
+            aiImgModalPreview.innerHTML = '<span class="text-muted">No image yet</span>';
+            aiImgUseBtn.style.display = "none";
+            currentImageUrl = "";
+            aiImgModal.show();
+        };
+    }
+
+    aiImgGenerateBtn.onclick = function() {
+        const prompt = aiImgPrompt.value;
+        if (!prompt) {
+            alert("Please enter a prompt!");
+            return;
+        }
+        aiImgGenerateBtn.disabled = true;
+        aiImgGenerateBtn.innerText = "Generating...";
+        aiImgModalPreview.innerHTML = '<span class="text-info">Generating image...</span>';
+        fetch("{% url 'ai_generate_image' %}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": "{{ csrf_token }}"
+            },
+            body: JSON.stringify({prompt: prompt})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.image_url) {
+                aiImgModalPreview.innerHTML = `<img src="${data.image_url}" style="max-width:100%;border-radius:12px;">`;
+                aiImgUseBtn.style.display = "block";
+                currentImageUrl = data.image_url;
+            } else {
+                aiImgModalPreview.innerHTML = `<span class="text-danger">Failed to generate image.</span>`;
+                aiImgUseBtn.style.display = "none";
+                currentImageUrl = "";
+            }
+            aiImgGenerateBtn.disabled = false;
+            aiImgGenerateBtn.innerText = "Regenerate";
+        })
+        .catch(() => {
+            aiImgModalPreview.innerHTML = `<span class="text-danger">Failed to generate image.</span>`;
+            aiImgGenerateBtn.disabled = false;
+            aiImgGenerateBtn.innerText = "Regenerate";
+        });
+    };
+
+    aiImgUseBtn.onclick = function() {
+        if (currentImageUrl) {
+            // Fetch the image as a blob, create a File, and set it to the file input
+            fetch(currentImageUrl)
+                .then(res => res.blob())
+                .then(blob => {
+                    const file = new File([blob], "ai-generated.png", { type: blob.type });
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    const fileInput = document.getElementById('id_image');
+                    fileInput.files = dataTransfer.files;
+                    aiImgPreview.innerHTML = `<img src="${currentImageUrl}" style="max-width:100%;border-radius:12px;">`;
+                    aiImgModal.hide();
+                });
+        }
+    };
 });
 </script>
 {% endblock %}
