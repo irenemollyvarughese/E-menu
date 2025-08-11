@@ -449,15 +449,19 @@ import json
 @csrf_exempt
 @login_required
 def ai_generate_image(request):
+    """
+    Generates 5 AI images from a given prompt using Pollinations API.
+    """
     if request.method == "POST":
         data = json.loads(request.body)
         prompt = data.get('prompt') or f"A high quality food photo of {data.get('name', '')}"
 
-        # Pollinations API endpoint
-        api_url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}"
+        # Generate 5 image URLs (Pollinations generates images based on unique seeds)
+        images = []
+        for i in range(5):
+            image_url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}?seed={i}"
+            images.append(image_url)
 
-        # The API returns the image directly, so we just return the URL
-        image_url = api_url
+        return JsonResponse({"images": images})
 
-        return JsonResponse({"image_url": image_url})
     return JsonResponse({"error": "Invalid request"}, status=400)
