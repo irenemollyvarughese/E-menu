@@ -296,11 +296,19 @@ from django.shortcuts import render, get_object_or_404, redirect
 from .models import MenuItem
 from .forms import MenuItemForm
 
+# views.py
 @login_required
 def menu_items(request):
+    tag_filter = request.GET.get('tag', '').strip()
     items = MenuItem.objects.all()
-    return render(request, 'menu/menu_items.html', {'items': items})
-
+    if tag_filter:
+        items = items.filter(tags__name__iexact=tag_filter)
+    categories = Category.objects.all()
+    return render(request, 'menu/menu_items.html', {
+        'items': items,
+        'tag_filter': tag_filter,
+        'categories': categories,
+    })
 @login_required
 def add_menu_item(request):
     if request.method == 'POST':
@@ -449,15 +457,89 @@ import json
 @csrf_exempt
 @login_required
 def ai_generate_image(request):
+    """
+    Generates 5 AI images from a given prompt using Pollinations API.
+    """
     if request.method == "POST":
         data = json.loads(request.body)
         prompt = data.get('prompt') or f"A high quality food photo of {data.get('name', '')}"
 
-        # Pollinations API endpoint
-        api_url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}"
+        # Generate 5 image URLs (Pollinations generates images based on unique seeds)
+        images = []
+        for i in range(5):
+            image_url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}?seed={i}"
+            images.append(image_url)
 
-        # The API returns the image directly, so we just return the URL
-        image_url = api_url
+        return JsonResponse({"images": images})
 
-        return JsonResponse({"image_url": image_url})
     return JsonResponse({"error": "Invalid request"}, status=400)
+
+
+
+
+
+
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+import os, json, requests
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+import os, json, requests
+
+@require_POST
+def generate_ai_tags(request):
+    name = request.POST.get("name", "").strip()
+    category = request.POST.get("category", "").strip()
+
+    if not name or not category:
+        return JsonResponse({"error": "Missing name or category"}, status=400)
+
+    prompt = f"""
+You are a food menu tagging assistant.
+Based on the name and category, suggest relevant tags with emoji.
+Always apply these rules if matched:
+- If category or name suggests it is Non-Veg → add "Spicy 🌶️"
+- If category or name suggests it is Veg → add "Vegan 🥦"
+- If category or name includes drinks, juice, or specific beverages like mango juice → add "Cool Drinks 🥤"
+- If category or name includes ice cream, sundae, or dessert for kids → add "Kids’ Favorite 🧒"
+
+Menu item:
+Name: {name}
+Category: {category}
+
+Output ONLY a JSON array of objects with "name" and "emoji" fields.
+Example:
+[
+  {{"name": "Vegan", "emoji": "🥦"}},
+  {{"name": "Spicy", "emoji": "🌶️"}}
+]
+"""
+
+    api_key = os.getenv("COHERE_API_KEY")
+    if not api_key:
+        return JsonResponse({"error": "API key missing"}, status=500)
+
+    try:
+        response = requests.post(
+            "https://api.cohere.ai/v1/generate",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "model": "command-r-plus",
+                "prompt": prompt,
+                "max_tokens": 80,
+                "temperature": 0.4,
+            },
+            timeout=15,
+        )
+        response.raise_for_status()
+    except requests.RequestException as e:
+        return JsonResponse({"error": f"API request failed: {str(e)}"}, status=500)
+
+    generation_text = response.json().get("generations", [{}])[0].get("text", "[]").strip()
+
+    try:
+        tags = json.loads(generation_text)
+    except json.JSONDecodeError:
+        tags = []
+    
+    return JsonResponse({"tags": tags})

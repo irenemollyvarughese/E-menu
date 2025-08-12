@@ -1,6 +1,8 @@
 {% extends 'menu/admin_base.html' %}
+{% load static %}
 {% block content %}
 <h2>Menu Items</h2>
+
 <a href="{% url 'add_menu_item' %}" class="btn btn-success mb-3">+ Add Menu Item</a>
 <table class="table table-dark table-striped">
     <thead>
@@ -11,6 +13,7 @@
             <th>Available</th>
             <th>Image</th>
             <th>Actions</th>
+            <th>AI Tags</th>
         </tr>
     </thead>
     <tbody>
@@ -28,19 +31,94 @@
             </td>
             <td>
                 {% if item.image %}
-                    <img src="{{ item.image.url }}" width="50" height="50" style="object-fit:cover; border-radius:8px;">
+                    <img src="{{ item.image.url }}" width="50" height="50" style="object-fit:cover; border-radius:8px;" alt="{{ item.name }}">
                 {% endif %}
             </td>
             <td>
                 <a href="{% url 'edit_menu_item' item.id %}" class="btn btn-sm btn-warning">Edit</a>
                 <a href="{% url 'delete_menu_item' item.id %}" class="btn btn-sm btn-danger">Delete</a>
             </td>
+            <td>
+                <button class="btn btn-info btn-sm generate-tags-btn"
+                        data-name="{{ item.name|escapejs }}"
+                        data-category="{{ item.category.name|escapejs }}"
+                        aria-live="polite"
+                        aria-label="Generate AI tags for {{ item.name }}">
+                    Generate AI Tags
+                </button>
+                <div class="tags-output mt-2 small text-light d-flex flex-wrap gap-1"></div>
+            </td>
         </tr>
         {% empty %}
         <tr>
-            <td colspan="6" class="text-center text-muted">No menu items found.</td>
+            <td colspan="7" class="text-center text-muted">No menu items found.</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+
+<script>
+// Get CSRF token from cookies
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            cookie = cookie.trim();
+            if (cookie.startsWith(name + '=')) {
+                cookieValue = decodeURIComponent(cookie.slice(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+const csrftoken = getCookie('csrftoken');
+
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".generate-tags-btn").forEach(button => {
+        button.addEventListener("click", async function () {
+            const name = this.getAttribute("data-name");
+            const category = this.getAttribute("data-category");
+            const output = this.nextElementSibling;
+
+            this.disabled = true;
+            output.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Generating tags...';
+
+            try {
+                const response = await fetch("{% url 'generate_ai_tags' %}", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded",
+                        "X-CSRFToken": csrftoken
+                    },
+                    body: new URLSearchParams({ name, category })
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                const data = await response.json();
+                output.innerHTML = '';
+
+                if (data.tags && data.tags.length > 0) {
+                    data.tags.forEach(tag => {
+                        const span = document.createElement("span");
+                        span.className = "badge bg-secondary";
+                        // Use textContent to avoid HTML injection
+                        span.textContent = tag.name + (tag.emoji ? ` ${tag.emoji}` : "");
+                        output.appendChild(span);
+                    });
+                } else {
+                    output.innerHTML = "<em>No tags suggested.</em>";
+                }
+            } catch (error) {
+                output.innerHTML = "<em>Error generating tags.</em>";
+                console.error('Error:', error);
+            } finally {
+                this.disabled = false;
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

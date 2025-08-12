@@ -125,3 +125,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+
+
+
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+COHERE_API_KEY = os.getenv("COHERE_API_KEY")
