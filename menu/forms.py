@@ -5,6 +5,9 @@ class MenuItemForm(forms.ModelForm):
     class Meta:
         model = MenuItem
         fields = ['category', 'name', 'description', 'price', 'image', 'available']
+        widgets = {
+            'description_tone': forms.Select(attrs={'class': 'form-select'}),}
+
 
 
 

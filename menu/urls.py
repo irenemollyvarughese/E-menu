@@ -39,4 +39,8 @@ urlpatterns = [
 
     path('staff/menu/items/ai-generate-description/', views.ai_generate_description, name='ai_generate_description'),
     path('staff/menu/items/ai-generate-image/', views.ai_generate_image, name='ai_generate_image'),
+
+    
+     path("staff/menu/item/generate-tags/", views.generate_ai_tags, name="generate_ai_tags"),
+
 ]

@@ -2,43 +2,51 @@
 {% load form_extras %}
 {% block content %}
 <div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
-    <div class="card shadow-lg border-0" style="background: #23272f; border-radius: 22px; min-width: 370px; max-width: 480px; width: 100%;">
-        <div class="card-body p-4">
-            <h2 class="mb-4 text-center" style="color: #ffd700; letter-spacing: 1px; font-weight: 700;">Add Menu Item</h2>
-            <form method="post" enctype="multipart/form-data" autocomplete="off" id="menu-item-form">
-                {% csrf_token %}
-                {% for field in form %}
-                    <div class="mb-3">
-                        <label class="form-label" style="color:#ffd700; font-weight:600;">{{ field.label }}</label>
-                        <div class="input-group">
-                            {% if field.name == "description" %}
-                                {{ field|add_class:"custom-dark-input" }}
-                                <button type="button" class="btn btn-outline-info" id="ai-desc-btn" style="margin-left:10px; font-weight:600;">AI Generate</button>
-                            {% elif field.name == "image" %}
-                                {{ field|add_class:"custom-dark-input" }}
-                                <button type="button" class="btn btn-outline-info" id="ai-img-btn" style="margin-left:10px; font-weight:600;">AI Generate Image</button>
-                            {% else %}
-                                {{ field|add_class:"custom-dark-input" }}
-                            {% endif %}
-                        </div>
-                        {% if field.name == "image" %}
-                            <div id="ai-img-preview" class="mt-3"></div>
-                        {% endif %}
-                        {% if field.help_text %}
-                            <div class="form-text text-muted">{{ field.help_text }}</div>
-                        {% endif %}
-                        {% for error in field.errors %}
-                            <div class="text-danger small">{{ error }}</div>
-                        {% endfor %}
-                    </div>
-                {% endfor %}
-                <div class="d-flex justify-content-between mt-4">
-                    <button type="submit" class="btn btn-success px-4 py-2 shadow-sm" style="font-size:1.1rem;">Add Item</button>
-                    <a href="{% url 'menu_items' %}" class="btn btn-outline-light px-4 py-2" style="font-size:1.1rem;">Cancel</a>
-                </div>
-            </form>
+  <div class="card shadow-lg border-0" style="background: #23272f; border-radius: 22px; min-width: 370px; max-width: 480px; width: 100%;">
+    <div class="card-body p-4">
+      <h2 class="mb-4 text-center" style="color: #ffd700; letter-spacing: 1px; font-weight: 700;">Add Menu Item</h2>
+      <form method="post" enctype="multipart/form-data" autocomplete="off" id="menu-item-form">
+        {% csrf_token %}
+        {% for field in form %}
+          <div class="mb-3">
+            <label class="form-label" style="color:#ffd700; font-weight:600;" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            <div class="input-group">
+              {% if field.name == "description" %}
+                {{ field|add_class:"custom-dark-input" }}
+                <!-- Tone selection dropdown for description tone -->
+                <select id="id_description_tone" class="form-select custom-dark-input" style="max-width: 200px; margin-left:10px;">
+                  <option value="appetizing" selected>Appetizing</option>
+                  <option value="casual">Casual</option>
+                  <option value="humorous">Humorous</option>
+                  <option value="poetic">Poetic</option>
+                  <option value="formal">Formal</option>
+                </select>
+                <button type="button" class="btn btn-outline-info" id="ai-desc-btn" style="margin-left:10px; font-weight:600;">AI Generate</button>
+              {% elif field.name == "image" %}
+                {{ field|add_class:"custom-dark-input" }}
+                <button type="button" class="btn btn-outline-info" id="ai-img-btn" style="margin-left:10px; font-weight:600;">AI Generate Image</button>
+              {% else %}
+                {{ field|add_class:"custom-dark-input" }}
+              {% endif %}
+            </div>
+            {% if field.name == "image" %}
+              <div id="ai-img-preview" class="mt-3"></div>
+            {% endif %}
+            {% if field.help_text %}
+              <div class="form-text text-muted">{{ field.help_text }}</div>
+            {% endif %}
+            {% for error in field.errors %}
+              <div class="text-danger small">{{ error }}</div>
+            {% endfor %}
+          </div>
+        {% endfor %}
+        <div class="d-flex justify-content-between mt-4">
+          <button type="submit" class="btn btn-success px-4 py-2 shadow-sm" style="font-size:1.1rem;">Add Item</button>
+          <a href="{% url 'menu_items' %}" class="btn btn-outline-light px-4 py-2" style="font-size:1.1rem;">Cancel</a>
         </div>
+      </form>
     </div>
+  </div>
 </div>
 
 <!-- AI Image Modal -->
@@ -53,10 +61,10 @@
         <label for="ai-img-prompt" class="form-label" style="color:#ffd700;">Prompt</label>
         <textarea id="ai-img-prompt" class="form-control custom-dark-input" rows="3"></textarea>
         <div class="mt-3" id="ai-img-modal-preview" style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;">
-            <span class="text-muted">No images yet</span>
+          <span class="text-muted">No images yet</span>
         </div>
         <div class="text-center mt-3">
-            <button type="button" class="btn btn-outline-info" id="ai-img-generate-btn">Regenerate</button>
+          <button type="button" class="btn btn-outline-info" id="ai-img-generate-btn">Regenerate</button>
         </div>
       </div>
     </div>
@@ -64,177 +72,191 @@
 </div>
 
 <style>
-    .custom-dark-input,
-    .custom-dark-input:focus {
-        background: #181c22 !important;
-        color: #fff !important;
-        border: 1.5px solid #444 !important;
-        border-radius: 10px !important;
-        font-size: 1.08rem !important;
-        padding: 10px 14px !important;
-        box-shadow: none !important;
-        width: 100% !important;
-        margin-top: 2px;
-    }
-    .custom-dark-input:focus {
-        border: 1.5px solid #ffd700 !important;
-        box-shadow: 0 0 0 2px #ffd70033 !important;
-    }
-    .btn-success {
-        background: linear-gradient(90deg, #00c48c 60%, #00e676 100%);
-        border: none;
-        font-weight: 700;
-        border-radius: 12px;
-        letter-spacing: 0.5px;
-        box-shadow: 0 2px 8px #00c48c33;
-    }
-    .btn-success:hover {
-        background: linear-gradient(90deg, #00e676 60%, #00c48c 100%);
-        color: #181818;
-    }
-    .btn-outline-light {
-        border-radius: 12px;
-        font-weight: 700;
-        border: 1.5px solid #fff;
-        color: #fff;
-        background: transparent;
-        letter-spacing: 0.5px;
-    }
-    .btn-outline-light:hover {
-        background: #ffd700;
-        color: #181818;
-        border: 1.5px solid #ffd700;
-    }
-    .btn-outline-info {
-        border-radius: 10px;
-        font-weight: 600;
-        border: 1.5px solid #00c48c;
-        color: #00c48c;
-        background: transparent;
-        transition: background 0.2s, color 0.2s;
-    }
-    .btn-outline-info:hover {
-        background: #00c48c;
-        color: #fff;
-        border: 1.5px solid #00c48c;
-    }
-    .card {
-        box-shadow: 0 8px 32px #000a, 0 1.5px 8px #ffd70022;
-    }
+  .custom-dark-input,
+  .custom-dark-input:focus {
+    background: #181c22 !important;
+    color: #fff !important;
+    border: 1.5px solid #444 !important;
+    border-radius: 10px !important;
+    font-size: 1.08rem !important;
+    padding: 10px 14px !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    margin-top: 2px;
+  }
+  .custom-dark-input:focus {
+    border: 1.5px solid #ffd700 !important;
+    box-shadow: 0 0 0 2px #ffd70033 !important;
+  }
+  .btn-success {
+    background: linear-gradient(90deg, #00c48c 60%, #00e676 100%);
+    border: none;
+    font-weight: 700;
+    border-radius: 12px;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 8px #00c48c33;
+  }
+  .btn-success:hover {
+    background: linear-gradient(90deg, #00e676 60%, #00c48c 100%);
+    color: #181818;
+  }
+  .btn-outline-light {
+    border-radius: 12px;
+    font-weight: 700;
+    border: 1.5px solid #fff;
+    color: #fff;
+    background: transparent;
+    letter-spacing: 0.5px;
+  }
+  .btn-outline-light:hover {
+    background: #ffd700;
+    color: #181818;
+    border: 1.5px solid #ffd700;
+  }
+  .btn-outline-info {
+    border-radius: 10px;
+    font-weight: 600;
+    border: 1.5px solid #00c48c;
+    color: #00c48c;
+    background: transparent;
+    transition: background 0.2s, color 0.2s;
+  }
+  .btn-outline-info:hover {
+    background: #00c48c;
+    color: #fff;
+    border: 1.5px solid #00c48c;
+  }
+  .card {
+    box-shadow: 0 8px 32px #000a, 0 1.5px 8px #ffd70022;
+  }
+  #ai-img-preview img {
+    max-width: 100%;
+    border-radius: 12px;
+  }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    // AI Description
-    const aiBtn = document.getElementById('ai-desc-btn');
-    if (aiBtn) {
-        aiBtn.onclick = function() {
-            const name = document.getElementById('id_name').value;
-            const category = document.getElementById('id_category') ? document.getElementById('id_category').value : '';
-            if (!name) {
-                alert("Please enter the dish name first!");
-                return;
-            }
-            aiBtn.disabled = true;
-            aiBtn.innerText = "Generating...";
-            fetch("{% url 'ai_generate_description' %}", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRFToken": "{{ csrf_token }}"
-                },
-                body: JSON.stringify({name: name, category: category})
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('id_description').value = data.description;
-                aiBtn.disabled = false;
-                aiBtn.innerText = "AI Generate";
-            })
-            .catch(() => {
-                alert("Failed to generate description.");
-                aiBtn.disabled = false;
-                aiBtn.innerText = "AI Generate";
-            });
-        };
-    }
+  // AI Description Button
+  const aiDescBtn = document.getElementById('ai-desc-btn');
+  if (aiDescBtn) {
+    aiDescBtn.onclick = function() {
+      const name = document.getElementById('id_name').value.trim();
+      const categoryElem = document.getElementById('id_category');
+      const category = categoryElem ? categoryElem.options[categoryElem.selectedIndex].text : '';
+      const toneElem = document.getElementById('id_description_tone');
+      const tone = toneElem ? toneElem.value : 'appetizing';
 
-    // AI Image Logic
-    const aiImgBtn = document.getElementById('ai-img-btn');
-    const aiImgModal = new bootstrap.Modal(document.getElementById('aiImageModal'));
-    const aiImgPrompt = document.getElementById('ai-img-prompt');
-    const aiImgGenerateBtn = document.getElementById('ai-img-generate-btn');
-    const aiImgModalPreview = document.getElementById('ai-img-modal-preview');
-    const aiImgPreview = document.getElementById('ai-img-preview');
+      if (!name) {
+        alert("Please enter the dish name first!");
+        return;
+      }
 
-    function loadImages(prompt) {
-        aiImgModalPreview.innerHTML = '<span class="text-info">Generating images...</span>';
-        fetch("{% url 'ai_generate_image' %}", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRFToken": "{{ csrf_token }}"
-            },
-            body: JSON.stringify({prompt: prompt})
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.images && data.images.length > 0) {
-                aiImgModalPreview.innerHTML = "";
-                data.images.forEach(url => {
-                    const img = document.createElement("img");
-                    img.src = url;
-                    img.style.maxWidth = "150px";
-                    img.style.borderRadius = "10px";
-                    img.style.cursor = "pointer";
-                    img.onclick = function() {
-                        selectAIImage(url);
-                    };
-                    aiImgModalPreview.appendChild(img);
-                });
-            } else {
-                aiImgModalPreview.innerHTML = `<span class="text-danger">Failed to generate images.</span>`;
-            }
-        })
-        .catch(() => {
-            aiImgModalPreview.innerHTML = `<span class="text-danger">Failed to generate images.</span>`;
-        });
-    }
+      aiDescBtn.disabled = true;
+      aiDescBtn.innerText = "Generating...";
 
-    if (aiImgBtn) {
-        aiImgBtn.onclick = function() {
-            const name = document.getElementById('id_name').value;
-            aiImgPrompt.value = name ? `A high quality food photo of ${name}` : "";
-            aiImgModal.show();
-            if (aiImgPrompt.value) {
-                loadImages(aiImgPrompt.value);
-            }
-        };
-    }
-
-    aiImgGenerateBtn.onclick = function() {
-        const prompt = aiImgPrompt.value;
-        if (!prompt) {
-            alert("Please enter a prompt!");
-            return;
+      fetch("{% url 'ai_generate_description' %}", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": "{{ csrf_token }}"
+        },
+        body: JSON.stringify({name: name, category: category, tone: tone})
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.description) {
+          document.getElementById('id_description').value = data.description;
+        } else {
+          alert("Failed to generate description.");
         }
-        loadImages(prompt);
+        aiDescBtn.disabled = false;
+        aiDescBtn.innerText = "AI Generate";
+      })
+      .catch(() => {
+        alert("Failed to generate description.");
+        aiDescBtn.disabled = false;
+        aiDescBtn.innerText = "AI Generate";
+      });
     };
+  }
 
-    function selectAIImage(url) {
-        fetch(url)
-            .then(res => res.blob())
-            .then(blob => {
-                const file = new File([blob], "ai-generated.png", { type: blob.type });
-                const dataTransfer = new DataTransfer();
-                dataTransfer.items.add(file);
-                const fileInput = document.getElementById('id_image');
-                fileInput.files = dataTransfer.files;
-                aiImgPreview.innerHTML = `<img src="${url}" style="max-width:100%;border-radius:12px;">`;
-                aiImgModal.hide();
-            });
+  // AI Image Modal Elements
+  const aiImgBtn = document.getElementById('ai-img-btn');
+  const aiImgModal = new bootstrap.Modal(document.getElementById('aiImageModal'));
+  const aiImgPrompt = document.getElementById('ai-img-prompt');
+  const aiImgGenerateBtn = document.getElementById('ai-img-generate-btn');
+  const aiImgModalPreview = document.getElementById('ai-img-modal-preview');
+  const aiImgPreview = document.getElementById('ai-img-preview');
+
+  function loadImages(prompt) {
+    aiImgModalPreview.innerHTML = '<span class="text-info">Generating images...</span>';
+    fetch("{% url 'ai_generate_image' %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": "{{ csrf_token }}"
+      },
+      body: JSON.stringify({prompt: prompt})
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.images && data.images.length > 0) {
+        aiImgModalPreview.innerHTML = "";
+        data.images.forEach(url => {
+          const img = document.createElement("img");
+          img.src = url;
+          img.style.maxWidth = "150px";
+          img.style.borderRadius = "10px";
+          img.style.cursor = "pointer";
+          img.onclick = function() {
+            selectAIImage(url);
+          };
+          aiImgModalPreview.appendChild(img);
+        });
+      } else {
+        aiImgModalPreview.innerHTML = `<span class="text-danger">Failed to generate images.</span>`;
+      }
+    })
+    .catch(() => {
+      aiImgModalPreview.innerHTML = `<span class="text-danger">Failed to generate images.</span>`;
+    });
+  }
+
+  if (aiImgBtn) {
+    aiImgBtn.onclick = function() {
+      const name = document.getElementById('id_name').value.trim();
+      aiImgPrompt.value = name ? `A high quality food photo of ${name}` : "";
+      aiImgModal.show();
+      if (aiImgPrompt.value) {
+        loadImages(aiImgPrompt.value);
+      }
+    };
+  }
+
+  aiImgGenerateBtn.onclick = function() {
+    const prompt = aiImgPrompt.value.trim();
+    if (!prompt) {
+      alert("Please enter a prompt!");
+      return;
     }
+    loadImages(prompt);
+  };
+
+  function selectAIImage(url) {
+    fetch(url)
+      .then(res => res.blob())
+      .then(blob => {
+        const file = new File([blob], "ai-generated.png", { type: blob.type });
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        const fileInput = document.getElementById('id_image');
+        fileInput.files = dataTransfer.files;
+        aiImgPreview.innerHTML = `<img src="${url}" style="max-width:100%;border-radius:12px;">`;
+        aiImgModal.hide();
+      });
+  }
 });
 </script>
 {% endblock %}

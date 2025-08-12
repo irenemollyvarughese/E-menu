@@ -30,16 +30,17 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(MenuItem)
 class MenuItemAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'price', 'available']
-    list_filter = ['category', 'available']
+    list_display = ['name', 'category', 'price', 'available','description_tone']
+    list_filter = ['category', 'available','description_tone']
     search_fields = ['name', 'description']
-
-
-
+    filter_horizontal = ("tags",)
 
 # new adding
 
-
+# new adding
+@admin.register(Tag)
+class TagAdmin(admin.ModelAdmin):
+    list_display = ("name", "emoji")
 
 # ---------------- Order & OrderItem Setup ----------------
 class OrderItemInline(admin.TabularInline):
