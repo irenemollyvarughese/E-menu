@@ -36,9 +36,19 @@
             font-size: 1.4rem;
             font-weight: 600;
             letter-spacing: 1px;
-            margin-bottom: 18px;
+            margin-bottom: 6px;
             margin-top: 0;
             font-family: 'Times New Roman', serif;
+        }
+        .table-chip {
+            display: inline-block;
+            background: #181818;
+            border: 1px solid #333;
+            color: #ffd700;
+            border-radius: 999px;
+            padding: 2px 10px;
+            font-size: .85rem;
+            margin-bottom: 12px;
         }
         .welcome-text {
             color: #fff;
@@ -77,18 +87,10 @@
             border-radius: 12px;
             font-size: 1.1rem;
         }
-        .btn-success:hover {
-            background: #00e676;
-        }
+        .btn-success:hover { background: #00e676; }
         @media (max-width: 500px) {
-            .auth-container {
-                max-width: 98vw;
-                padding: 18px 2vw 18px 2vw;
-            }
-            .food-img {
-                width: 90px;
-                height: 90px;
-            }
+            .auth-container { max-width: 98vw; padding: 18px 2vw; }
+            .food-img { width: 90px; height: 90px; }
         }
     </style>
 </head>
@@ -96,18 +98,49 @@
 <div class="auth-container">
     <img src="{% static 'menu/food.png' %}" class="food-img mb-3" alt="Food Image">
     <div class="hotel-title">{{ hotel.name }}</div>
+    {% if table_code %}
+        <div class="table-chip">
+            Table: {% if table %}{{ table.number }}{% else %}{{ table_code }}{% endif %}
+        </div>
+    {% endif %}
     <div class="welcome-text">Welcome to digital online menu service</div>
-    <form method="post" class="auth-form">
+
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags|default:'info' }} py-2">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+
+    <form method="post" class="auth-form"
+          {% if table_code %}
+            action="{% url 'mobile_login_table' qr_code table_code %}"
+          {% else %}
+            action="{% url 'mobile_login' qr_code %}"
+          {% endif %}>
         {% csrf_token %}
-        <div class="form-label mb-2">Enter The Mobile Number</div>
+        <div class="form-label mb-2">Enter the mobile number</div>
         <div class="input-group mb-4">
             <span class="input-group-text" style="background:#fff;">
                 <img src="{% static 'menu/india-flag.png' %}" width="24" alt="IN">
             </span>
-            <span class="input-group-text" style="background:#fff;">+ 91</span>
-            <input type="text" name="phone" class="form-control" placeholder="9885236970" maxlength="10" required pattern="\d{10}">
+            <span class="input-group-text" style="background:#fff;">+91</span>
+            <input
+                type="tel"
+                name="phone"
+                class="form-control"
+                placeholder="9885236970"
+                maxlength="10"
+                inputmode="numeric"
+                pattern="[0-9]{10}"
+                autocomplete="tel-national"
+                required
+                oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10);"
+                autofocus
+                aria-label="10-digit mobile number"
+                value="{{ phone|default:'' }}"
+            >
         </div>
-        <button type="submit" class="btn btn-success w-100 mb-2">Get Otp</button>
+        <button type="submit" class="btn btn-success w-100 mb-2">Get OTP</button>
     </form>
 </div>
 </body>

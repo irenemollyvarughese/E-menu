@@ -1,54 +1,134 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
-from .models import *
-from django.shortcuts import render, redirect
 from django.contrib import messages
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
+from django.contrib.admin.views.decorators import staff_member_required
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 
-def mobile_login(request, qr_code):
-    hotel = get_object_or_404(Hotel, qr_code=qr_code)  # Fetch the hotel
+import json
+import requests
+import os
+
+from .models import (
+    Hotel, Category, Tag, MenuItem,
+    DiningTable, Order, OrderItem
+)
+from .forms import MenuItemForm, CategoryForm
+
+
+# -----------------------------
+# MOBILE LOGIN / OTP
+# -----------------------------
+
+def mobile_login(request, qr_code, table_code=None):
+    hotel = get_object_or_404(Hotel, qr_code=qr_code)
+    table = None
+    if table_code:
+        table = get_object_or_404(DiningTable, hotel=hotel, table_code=table_code)
+
     if request.method == 'POST':
-        phone = request.POST.get('phone')
-        # Generate OTP, send SMS (use Twilio or similar)
+        phone = (request.POST.get('phone') or '').strip()
+        if not phone:
+            messages.error(request, 'Please enter a valid phone number.')
+            return render(request, 'menu/mobile_login.html', {
+                'qr_code': qr_code, 'hotel': hotel, 'table': table, 'table_code': table_code
+            })
+
+        # TODO: send a real OTP via your provider
         request.session['otp_phone'] = phone
-        # Save OTP in session or DB
-        request.session['otp_code'] = '1234'  # Replace with real OTP
+        request.session['otp_code'] = '1234'
+
+        if table:
+            request.session['table_id'] = table.id
+            return redirect('otp_verify_table', qr_code=qr_code, table_code=table_code)
         return redirect('otp_verify', qr_code=qr_code)
-    return render(request, 'menu/mobile_login.html', {'qr_code': qr_code, 'hotel': hotel})
+
+    return render(request, 'menu/mobile_login.html', {
+        'qr_code': qr_code,
+        'hotel': hotel,
+        'table': table,
+        'table_code': table_code
+    })
 
 
-def otp_verify(request, qr_code):
-    hotel = get_object_or_404(Hotel, qr_code=qr_code)  # Fetch the hotel
+def otp_verify(request, qr_code, table_code=None):
+    hotel = get_object_or_404(Hotel, qr_code=qr_code)
+    table = None
+    if table_code:
+        table = get_object_or_404(DiningTable, hotel=hotel, table_code=table_code)
+
+    # Optional: resend support (?resend=1)
+    if request.method == 'GET' and request.GET.get('resend'):
+        phone = request.session.get('otp_phone')
+        if phone:
+            # TODO: actually resend OTP via your provider
+            messages.success(request, 'OTP resent.')
+        return render(request, 'menu/otp_verify.html', {
+            'qr_code': qr_code, 'hotel': hotel, 'table': table, 'table_code': table_code
+        })
+
     if request.method == 'POST':
-        entered_otp = request.POST.get('otp')
+        entered_otp = (request.POST.get('otp') or '').strip()
         if entered_otp == request.session.get('otp_code'):
-            # OTP correct, redirect to menu
+            if table:
+                return redirect('public_menu_table', qr_code=qr_code, table_code=table_code)
             return redirect('public_menu', qr_code=qr_code)
         else:
             messages.error(request, 'Invalid OTP')
-    return render(request, 'menu/otp_verify.html', {'qr_code': qr_code, 'hotel': hotel})
+
+    return render(request, 'menu/otp_verify.html', {
+        'qr_code': qr_code,
+        'hotel': hotel,
+        'table': table,
+        'table_code': table_code
+    })
 
 
+# -----------------------------
+# PUBLIC MENU
+# -----------------------------
 
-def public_menu(request, qr_code):
-    # Block access if not logged in via OTP
+def public_menu(request, qr_code, table_code=None):
+    # Require OTP verification (simple gate using phone in session)
     if not request.session.get('otp_phone'):
+        if table_code:
+            return redirect('mobile_login_table', qr_code=qr_code, table_code=table_code)
         return redirect('mobile_login', qr_code=qr_code)
+
     hotel = get_object_or_404(Hotel, qr_code=qr_code)
+    table = None
+    if table_code:
+        table = get_object_or_404(DiningTable, hotel=hotel, table_code=table_code)
+        request.session['table_id'] = table.id  # keep table in session as fallback
+
     categories = Category.objects.filter(hotel=hotel).order_by('id')
+
+    # Build a minimal cart_items map for the template (item_id -> qty)
     cart = request.session.get('cart', {})
     cart_items = {int(k): v['quantity'] for k, v in cart.items()} if cart else {}
 
-    order = Order.objects.filter(hotel=hotel).order_by('-id').first()
+    order = Order.objects.filter(hotel=hotel, table=table).order_by('-id').first()
+
     return render(request, 'menu/public_menu.html', {
         'hotel': hotel,
         'categories': categories,
         'cart_items': cart_items,
         'qr_code': qr_code,
+        'table': table,
+        'table_code': table_code,
         'order_id': order.id if order else None,
     })
 
-def add_to_cart(request, qr_code, item_id):
+
+# -----------------------------
+# CART FUNCTIONS
+# -----------------------------
+
+def add_to_cart(request, qr_code, item_id, table_code=None):
     item = get_object_or_404(MenuItem, id=item_id)
+
     cart = request.session.get('cart', {})
     item_id_str = str(item_id)
     image_url = item.image.url if item.image else ''
@@ -62,11 +142,13 @@ def add_to_cart(request, qr_code, item_id):
             'image': image_url,
         }
     request.session['cart'] = cart
+
     subtotal = sum(i['price'] * i['quantity'] for i in cart.values())
     gst = round(subtotal * 0.05)
     total = subtotal + gst
     cart_count = sum(i['quantity'] for i in cart.values())
     item_quantity = cart[item_id_str]['quantity']
+
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
         return JsonResponse({
             'item_id': item_id_str,
@@ -76,12 +158,17 @@ def add_to_cart(request, qr_code, item_id):
             'gst': int(gst),
             'total': int(total),
         })
+
+    if table_code:
+        return redirect('view_cart_table', qr_code=qr_code, table_code=table_code)
     return redirect('view_cart', qr_code=qr_code)
 
-def remove_from_cart(request, qr_code, item_id):
+
+def remove_from_cart(request, qr_code, item_id, table_code=None):
     cart = request.session.get('cart', {})
     item_id_str = str(item_id)
     remove_all = request.POST.get('remove_all')
+
     if item_id_str in cart:
         if remove_all:
             del cart[item_id_str]
@@ -95,11 +182,14 @@ def remove_from_cart(request, qr_code, item_id):
                 item_quantity = cart[item_id_str]['quantity']
     else:
         item_quantity = 0
+
     request.session['cart'] = cart
+
     subtotal = sum(i['price'] * i['quantity'] for i in cart.values())
     gst = round(subtotal * 0.05)
     total = subtotal + gst
     cart_count = sum(i['quantity'] for i in cart.values())
+
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
         return JsonResponse({
             'item_id': item_id_str,
@@ -109,12 +199,16 @@ def remove_from_cart(request, qr_code, item_id):
             'gst': int(gst),
             'total': int(total),
         })
+
+    if table_code:
+        return redirect('view_cart_table', qr_code=qr_code, table_code=table_code)
     return redirect('view_cart', qr_code=qr_code)
 
-def view_cart(request, qr_code):
+
+def view_cart(request, qr_code, table_code=None):
     cart = request.session.get('cart', {})
     subtotal = sum(item['price'] * item['quantity'] for item in cart.values())
-    gst = round(subtotal * 0.05)  # 5% GST, adjust as needed
+    gst = round(subtotal * 0.05)
     total = subtotal + gst
     return render(request, 'menu/cart.html', {
         'cart': cart,
@@ -122,18 +216,20 @@ def view_cart(request, qr_code):
         'gst': int(gst),
         'total': int(total),
         'qr_code': qr_code,
+        'table_code': table_code
     })
 
 
+# -----------------------------
+# PAYMENT & ORDER
+# -----------------------------
 
-
-
-# new addind(payment)
-
-def payment_page(request, qr_code):
+def payment_page(request, qr_code, table_code=None):
     cart = request.session.get('cart', {})
     if not cart:
         messages.warning(request, "Cart is empty.")
+        if table_code:
+            return redirect('public_menu_table', qr_code=qr_code, table_code=table_code)
         return redirect('public_menu', qr_code=qr_code)
 
     subtotal = sum(item['price'] * item['quantity'] for item in cart.values())
@@ -145,61 +241,79 @@ def payment_page(request, qr_code):
         'subtotal': subtotal,
         'gst': gst,
         'total': total,
-        'qr_code': qr_code
+        'qr_code': qr_code,
+        'table_code': table_code
     }
     return render(request, 'menu/payment_page.html', context)
 
 
+def confirm_order(request, qr_code, table_code=None):
+    if request.method != 'POST':
+        if table_code:
+            return redirect('public_menu_table', qr_code=qr_code, table_code=table_code)
+        return redirect('public_menu', qr_code=qr_code)
 
+    cart = request.session.get('cart', {})
+    guest_count = int(request.POST.get('guest_count', 1))
+    payment_method = request.POST.get('payment_method')
 
-def confirm_order(request, qr_code):
-    if request.method == 'POST':
-        cart = request.session.get('cart', {})
-        guest_count = int(request.POST.get('guest_count', 1))
-        payment_method = request.POST.get('payment_method')  # COD or ONLINE
+    if not cart:
+        messages.error(request, "Cart is empty.")
+        if table_code:
+            return redirect('public_menu_table', qr_code=qr_code, table_code=table_code)
+        return redirect('public_menu', qr_code=qr_code)
 
-        if not cart:
-            messages.error(request, "Cart is empty.")
-            return redirect('public_menu', qr_code=qr_code)
+    hotel = get_object_or_404(Hotel, qr_code=qr_code)
 
-        hotel = get_object_or_404(Hotel, qr_code=qr_code)
+    # Resolve table from URL or session (fallback)
+    table = None
+    if table_code:
+        table = get_object_or_404(DiningTable, hotel=hotel, table_code=table_code)
+    else:
+        table_id = request.session.get('table_id')
+        if table_id:
+            table = DiningTable.objects.filter(hotel=hotel, id=table_id).first()
 
-        subtotal = sum(item['price'] * item['quantity'] for item in cart.values())
-        gst = round(subtotal * 0.05, 2)
-        total = round(subtotal + gst, 2)
+    subtotal = sum(item['price'] * item['quantity'] for item in cart.values())
+    gst = round(subtotal * 0.05, 2)
+    total = round(subtotal + gst, 2)
 
-        order = Order.objects.create(
-            hotel=hotel,
-            guest_count=guest_count,
-            payment_method=payment_method,
-            subtotal=subtotal,
-            gst=gst,
-            total_amount=total,
-            status='New'
+    order = Order.objects.create(
+        hotel=hotel,
+        table=table,  # ensure table is saved on the order
+        guest_count=guest_count,
+        payment_method=payment_method,
+        subtotal=subtotal,
+        gst=gst,
+        total_amount=total,
+        status='New'
+    )
+
+    for item_id, item in cart.items():
+        menu_item = get_object_or_404(MenuItem, id=int(item_id))
+        OrderItem.objects.create(
+            order=order,
+            menu_item=menu_item,
+            quantity=item['quantity'],
+            price=item['price']
         )
 
-        for item_id, item in cart.items():
-            menu_item = get_object_or_404(MenuItem, id=item_id)
-            OrderItem.objects.create(
-                order=order,
-                menu_item=menu_item,
-                quantity=item['quantity'],
-                price=item['price']
-            )
+    # Clear cart after creating the order
+    request.session.pop('cart', None)
 
-        del request.session['cart']
-
-        if payment_method == 'COD':
-            return redirect('order_success', order_id=order.id)
-        else:
-            return redirect('card_payment', qr_code=qr_code, order_id=order.id)
+    if payment_method == 'COD':
+        return redirect('order_success', order_id=order.id)
+    # Online: go to correct card-payment route
+    if table_code:
+        return redirect('card_payment_table', qr_code=qr_code, table_code=table_code, order_id=order.id)
+    return redirect('card_payment', qr_code=qr_code, order_id=order.id)
 
 
-def card_payment(request, qr_code, order_id):
-    # Simulate card processing with delay
+def card_payment(request, qr_code, order_id, table_code=None):
     return render(request, 'menu/card_payment.html', {
         'order_id': order_id,
-        'qr_code': qr_code
+        'qr_code': qr_code,
+        'table_code': table_code
     })
 
 
@@ -207,36 +321,44 @@ def order_success(request, order_id):
     order = get_object_or_404(Order, id=order_id)
     return render(request, 'menu/order_success.html', {'order': order})
 
-def track_order_view(request, qr_code, order_id):
+
+def track_order_view(request, qr_code, order_id, table_code=None):
     order = get_object_or_404(Order, id=order_id, hotel__qr_code=qr_code)
     steps = ['New', 'Preparing', 'Ready', 'Served']
-    status_path = steps[:steps.index(order.status)]  # Already completed steps
-
+    status_path = steps[:steps.index(order.status)] if order.status in steps else []
     return render(request, 'menu/track_order_status.html', {
         'order': order,
         'steps': steps,
-        'qr_code': qr_code, 
+        'qr_code': qr_code,
+        'table_code': table_code,
         'order_status_path': status_path,
     })
 
 
-from django.contrib.admin.views.decorators import staff_member_required
-from django.shortcuts import render, get_object_or_404, redirect
-from .models import Order
+# -----------------------------
+# STAFF ORDER MGMT
+# -----------------------------
 
 @staff_member_required
 def staff_orders(request):
-    # Define which statuses are active and which are completed
     active_statuses = ['New', 'Preparing', 'Ready']
     completed_statuses = ['Served']
-    orders_active = Order.objects.filter(status__in=active_statuses).order_by('-created_at')
-    orders_completed = Order.objects.filter(status__in=completed_statuses).order_by('-created_at')
+
+    # Prefetch everything needed for the template
+    base = (Order.objects
+            .select_related('hotel', 'table')
+            .prefetch_related('items__menu_item'))
+
+    orders_active = base.filter(status__in=active_statuses).order_by('-created_at')
+    orders_completed = base.filter(status__in=completed_statuses).order_by('-created_at')
+
     status_choices = ['New', 'Preparing', 'Ready', 'Served']
     return render(request, 'menu/staff_orders.html', {
         'orders_active': orders_active,
         'orders_completed': orders_completed,
         'status_choices': status_choices,
     })
+
 
 @staff_member_required
 def update_order_status(request, order_id):
@@ -249,13 +371,13 @@ def update_order_status(request, order_id):
     return redirect('staff_orders')
 
 
-from django.contrib.auth import authenticate, login, logout
-from django.shortcuts import render, redirect
-from django.contrib import messages
+# -----------------------------
+# ADMIN LOGIN & DASHBOARD
+# -----------------------------
 
 def admin_login(request):
     if request.user.is_authenticated:
-        return redirect('admin_dashboard')  # or wherever your dashboard is
+        return redirect('admin_dashboard')
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
@@ -267,36 +389,25 @@ def admin_login(request):
             messages.error(request, "Invalid credentials or not an admin user.")
     return render(request, 'menu/admin_login.html')
 
+
 def admin_logout(request):
     logout(request)
     return redirect('admin_login')
 
 
 def admin_dashboard(request):
-    # You can add context as needed
     return render(request, 'menu/admin_dashboard.html')
-
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect
 
 
 @login_required
 def admin_settings(request):
-    # Replace with your real logic
     return render(request, 'menu/admin_settings.html')
 
-def admin_logout(request):
-    from django.contrib.auth import logout
-    logout(request)
-    return redirect('admin_login')
 
+# -----------------------------
+# MENU ITEM MGMT
+# -----------------------------
 
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, get_object_or_404, redirect
-from .models import MenuItem
-from .forms import MenuItemForm
-
-# views.py
 @login_required
 def menu_items(request):
     tag_filter = request.GET.get('tag', '').strip()
@@ -309,6 +420,8 @@ def menu_items(request):
         'tag_filter': tag_filter,
         'categories': categories,
     })
+
+
 @login_required
 def add_menu_item(request):
     if request.method == 'POST':
@@ -319,6 +432,7 @@ def add_menu_item(request):
     else:
         form = MenuItemForm()
     return render(request, 'menu/add_menu_item.html', {'form': form})
+
 
 @login_required
 def edit_menu_item(request, item_id):
@@ -332,6 +446,7 @@ def edit_menu_item(request, item_id):
         form = MenuItemForm(instance=item)
     return render(request, 'menu/edit_menu_item.html', {'form': form, 'item': item})
 
+
 @login_required
 def delete_menu_item(request, item_id):
     item = get_object_or_404(MenuItem, id=item_id)
@@ -341,13 +456,15 @@ def delete_menu_item(request, item_id):
     return render(request, 'menu/delete_menu_item.html', {'item': item})
 
 
-from .models import Category
-from .forms import CategoryForm
+# -----------------------------
+# CATEGORY MGMT
+# -----------------------------
 
 @login_required
 def menu_categories(request):
     categories = Category.objects.all()
     return render(request, 'menu/menu_categories.html', {'categories': categories})
+
 
 @login_required
 def add_category(request):
@@ -359,6 +476,7 @@ def add_category(request):
     else:
         form = CategoryForm()
     return render(request, 'menu/add_category.html', {'form': form})
+
 
 @login_required
 def edit_category(request, cat_id):
@@ -372,6 +490,7 @@ def edit_category(request, cat_id):
         form = CategoryForm(instance=category)
     return render(request, 'menu/edit_category.html', {'form': form, 'category': category})
 
+
 @login_required
 def delete_category(request, cat_id):
     category = get_object_or_404(Category, id=cat_id)
@@ -381,115 +500,93 @@ def delete_category(request, cat_id):
     return render(request, 'menu/delete_category.html', {'category': category})
 
 
-
-import cohere
-from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
-from django.contrib.auth.decorators import login_required
-import json
+# -----------------------------
+# AI DESCRIPTION GENERATOR (admin)
+# -----------------------------
 
 @csrf_exempt
 @login_required
 def ai_generate_description(request):
-    if request.method == "POST":
-        data = json.loads(request.body)
-        name = data.get('name', '')
-        category = data.get('category', '')
-        prompt = f"Write a delicious, enticing menu description for a dish called '{name}'"
-        if category:
-            prompt += f" in the category '{category}'"
-        prompt += ". Make it sound appetizing and unique."
-        co = cohere.Client("7V1TXcGKbgtUGkK77L8Qks0py1FvYo7itNYlsubl")
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid request"}, status=400)
+
+    try:
+        data = json.loads(request.body or "{}")
+    except Exception:
+        data = {}
+    name = data.get('name', '')
+    category = data.get('category', '')
+
+    prompt = f"Write a delicious, enticing menu description for a dish called '{name}'."
+    if category:
+        prompt += f" It is in the '{category}' category."
+    prompt += " Make it sound appetizing, concise, and unique. 2-3 sentences."
+
+    api_key = os.getenv("COHERE_API_KEY")
+    description = ""
+    if api_key:
         try:
-            response = co.generate(
-                model="command",
-                prompt=prompt,
-                max_tokens=60,
-                temperature=0.7,
+            resp = requests.post(
+                "https://api.cohere.ai/v1/generate",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "command-r-plus",
+                    "prompt": prompt,
+                    "max_tokens": 120,
+                    "temperature": 0.6,
+                },
+                timeout=15,
             )
-            description = response.generations[0].text.strip()
+            resp.raise_for_status()
+            description = (resp.json().get("generations", [{}])[0].get("text") or "").strip()
         except Exception as e:
             description = f"AI description not available (error: {str(e)})"
-        return JsonResponse({"description": description})
-    return JsonResponse({"error": "Invalid request"}, status=400)
+    else:
+        description = "A tasty dish prepared with care. Description pending."
+
+    return JsonResponse({"description": description})
 
 
-
-import requests
-from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
-from django.contrib.auth.decorators import login_required
-import json
-import base64
+# -----------------------------
+# AI IMAGE GENERATOR (admin demo)
+# -----------------------------
 
 @csrf_exempt
 @login_required
 def ai_generate_image(request):
-    if request.method == "POST":
-        data = json.loads(request.body)
-        name = data.get('name', '')
-        description = data.get('description', '')
-        prompt = f"High quality food photo of {name}. {description}"
-        HF_TOKEN = "YOUR_HUGGINGFACE_TOKEN"
-        API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2"
-        headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-        payload = {"inputs": prompt}
-        response = requests.post(API_URL, headers=headers, json=payload)
-        if response.status_code == 200 and response.headers.get("content-type", "").startswith("image/"):
-            # Save image to media folder or serve as base64
-            image_data = base64.b64encode(response.content).decode("utf-8")
-            image_url = f"data:image/png;base64,{image_data}"
-            return JsonResponse({"image_url": image_url})
-        else:
-            return JsonResponse({"error": "Failed to generate image."})
-    return JsonResponse({"error": "Invalid request"}, status=400)
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid request"}, status=400)
+
+    try:
+        data = json.loads(request.body or "{}")
+    except Exception:
+        data = {}
+
+    prompt = data.get('prompt') or f"A high quality food photo of {data.get('name', '')}"
+    images = []
+    for i in range(5):
+        image_url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}?seed={i}"
+        images.append(image_url)
+    return JsonResponse({"images": images})
 
 
-
-
-
-import requests
-from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
-from django.contrib.auth.decorators import login_required
-import json
-
-@csrf_exempt
-@login_required
-def ai_generate_image(request):
-    """
-    Generates 5 AI images from a given prompt using Pollinations API.
-    """
-    if request.method == "POST":
-        data = json.loads(request.body)
-        prompt = data.get('prompt') or f"A high quality food photo of {data.get('name', '')}"
-
-        # Generate 5 image URLs (Pollinations generates images based on unique seeds)
-        images = []
-        for i in range(5):
-            image_url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}?seed={i}"
-            images.append(image_url)
-
-        return JsonResponse({"images": images})
-
-    return JsonResponse({"error": "Invalid request"}, status=400)
-
-
-
-
-
-
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
-import os, json, requests
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
-import os, json, requests
+# -----------------------------
+# AI TAG GENERATOR (public)
+# -----------------------------
 
 @require_POST
 def generate_ai_tags(request):
-    name = request.POST.get("name", "").strip()
-    category = request.POST.get("category", "").strip()
+    # Accept both form-encoded and application/json
+    try:
+        data = json.loads(request.body.decode("utf-8")) if request.content_type and "application/json" in request.content_type else {}
+    except Exception:
+        data = {}
+
+    name = (request.POST.get("name") or data.get("name") or "").strip()
+    category = (request.POST.get("category") or data.get("category") or "").strip()
 
     if not name or not category:
         return JsonResponse({"error": "Missing name or category"}, status=400)
@@ -513,16 +610,19 @@ Example:
   {{"name": "Vegan", "emoji": "🥦"}},
   {{"name": "Spicy", "emoji": "🌶️"}}
 ]
-"""
+""".strip()
 
     api_key = os.getenv("COHERE_API_KEY")
     if not api_key:
-        return JsonResponse({"error": "API key missing"}, status=500)
+        return JsonResponse({"tags": []})  # Fail silently for the public UI
 
     try:
         response = requests.post(
             "https://api.cohere.ai/v1/generate",
-            headers={"Authorization": f"Bearer {api_key}"},
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
             json={
                 "model": "command-r-plus",
                 "prompt": prompt,
@@ -532,14 +632,42 @@ Example:
             timeout=15,
         )
         response.raise_for_status()
-    except requests.RequestException as e:
-        return JsonResponse({"error": f"API request failed: {str(e)}"}, status=500)
+    except requests.RequestException:
+        return JsonResponse({"tags": []})
 
-    generation_text = response.json().get("generations", [{}])[0].get("text", "[]").strip()
+    generation_text = (response.json().get("generations", [{}])[0].get("text") or "").strip()
 
+    # Strip code fences safely
+    if generation_text.startswith("```"):
+        lines = generation_text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        generation_text = "\n".join(lines).strip()
+
+    # Parse JSON or fallback
+    tags = []
     try:
-        tags = json.loads(generation_text)
+        parsed = json.loads(generation_text)
+        if isinstance(parsed, list):
+            tags = parsed
     except json.JSONDecodeError:
+        start = generation_text.find("[")
+        end = generation_text.rfind("]")
+        if start != -1 and end != -1 and end > start:
+            try:
+                tags = json.loads(generation_text[start:end+1])
+            except Exception:
+                tags = []
+
+    # Normalize
+    if isinstance(tags, list):
+        tags = [
+            {"name": (t.get("name") or "").strip(), "emoji": (t.get("emoji") or "").strip()}
+            for t in tags if isinstance(t, dict)
+        ]
+    else:
         tags = []
-    
+
     return JsonResponse({"tags": tags})

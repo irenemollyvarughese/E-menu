@@ -1,61 +1,130 @@
 from django.contrib import admin
-from .models import *
+from django.utils.html import format_html
+from .models import (
+    Hotel, Category, MenuItem, Tag,
+    Order, OrderItem, DiningTable
+)
 
-# Show Category inline inside Hotel admin
+# ---------------- Inlines ----------------
+
 class CategoryInline(admin.TabularInline):
     model = Category
     extra = 1
 
-# Show MenuItems inline inside Category admin
+
 class MenuItemInline(admin.TabularInline):
     model = MenuItem
     extra = 1
 
-from django.utils.html import mark_safe
 
-@admin.register(Hotel)
-class HotelAdmin(admin.ModelAdmin):
-    list_display = ['name', 'location', 'qr_code', 'qr_preview']
+class DiningTableInline(admin.TabularInline):
+    model = DiningTable
+    extra = 1
+    fields = ('number', 'seats', 'is_active', 'qr_preview')
+    readonly_fields = ('qr_preview',)
 
     def qr_preview(self, obj):
         if obj.qr_image:
-            return mark_safe(f'<img src="{obj.qr_image.url}" width="100" />')
-        return "(No QR yet)"
-    qr_preview.short_description = 'QR Code'
+            return format_html(
+                '<img src="{}" width="64" height="64" style="object-fit:cover;border-radius:8px;border:1px solid #eee;" />',
+                obj.qr_image.url
+            )
+        return '-'
+    qr_preview.short_description = "QR"
 
-@admin.register(Category)
-class CategoryAdmin(admin.ModelAdmin):
-    list_display = ['name', 'hotel']
-    inlines = [MenuItemInline]
 
-@admin.register(MenuItem)
-class MenuItemAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'price', 'available','description_tone']
-    list_filter = ['category', 'available','description_tone']
-    search_fields = ['name', 'description']
-    filter_horizontal = ("tags",)
-
-# new adding
-
-# new adding
-@admin.register(Tag)
-class TagAdmin(admin.ModelAdmin):
-    list_display = ("name", "emoji")
-
-# ---------------- Order & OrderItem Setup ----------------
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
     readonly_fields = ['menu_item', 'quantity', 'price']
     can_delete = False
 
+
+# ---------------- Admin classes ----------------
+
+@admin.register(Hotel)
+class HotelAdmin(admin.ModelAdmin):
+    list_display = ['name', 'location', 'qr_code', 'qr_preview']
+    search_fields = ['name', 'location', 'qr_code']
+    readonly_fields = ('qr_preview', 'qr_image')
+    inlines = [CategoryInline, DiningTableInline]
+
+    def qr_preview(self, obj):
+        if obj.qr_image:
+            return format_html(
+                '<img src="{}" width="100" height="100" style="object-fit:cover;border-radius:8px;border:1px solid #eee;" />',
+                obj.qr_image.url
+            )
+        return "(No QR yet)"
+    qr_preview.short_description = 'Hotel QR'
+
+
+@admin.register(DiningTable)
+class DiningTableAdmin(admin.ModelAdmin):
+    list_display = ('hotel', 'number', 'seats', 'is_active', 'qr_preview')
+    list_filter = ('hotel', 'is_active')
+    search_fields = ('number', 'table_code', 'hotel__name')
+    readonly_fields = ('qr_preview', 'table_code', 'qr_image')
+    actions = ['regenerate_qr']
+
+    def qr_preview(self, obj):
+        if obj.qr_image:
+            return format_html(
+                '<img src="{}" width="80" height="80" style="object-fit:cover;border-radius:8px;border:1px solid #eee;" />',
+                obj.qr_image.url
+            )
+        return '-'
+    qr_preview.short_description = "QR"
+
+    @admin.action(description="Regenerate QR for selected tables")
+    def regenerate_qr(self, request, queryset):
+        count = 0
+        for obj in queryset:
+            # Delete existing QR so model.save() re-creates it
+            if obj.qr_image:
+                obj.qr_image.delete(save=False)
+            obj.qr_image = None
+            obj.save()
+            count += 1
+        self.message_user(request, f"Regenerated QR for {count} table(s).")
+
+
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ['name', 'hotel']
+    list_filter = ['hotel']
+    search_fields = ['name', 'hotel__name']
+    inlines = [MenuItemInline]
+
+
+@admin.register(MenuItem)
+class MenuItemAdmin(admin.ModelAdmin):
+    list_display = ['name', 'category', 'price', 'available', 'description_tone']
+    list_filter = ['available', 'category__hotel', 'category', 'description_tone']
+    search_fields = ['name', 'description']
+    autocomplete_fields = ('category',)
+    filter_horizontal = ("tags",)
+
+
+@admin.register(Tag)
+class TagAdmin(admin.ModelAdmin):
+    list_display = ("name", "emoji")
+    search_fields = ('name',)
+
+
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ['id', 'hotel', 'guest_count', 'payment_method', 'total_amount', 'created_at']
-    list_filter = ['hotel', 'payment_method', 'created_at']
+    list_display = ['id', 'hotel', 'table_display', 'status', 'guest_count',
+                    'payment_method', 'total_amount', 'created_at']
+    list_filter = ['hotel', 'status', 'payment_method', 'created_at']
     date_hierarchy = 'created_at'
+    search_fields = ['id', 'hotel__name', 'table__number']
     inlines = [OrderItemInline]
-    search_fields = ['id', 'hotel__name']
+
+    def table_display(self, obj):
+        return obj.table.number if getattr(obj, 'table', None) else '—'
+    table_display.short_description = 'Table'
+
 
 @admin.register(OrderItem)
 class OrderItemAdmin(admin.ModelAdmin):
