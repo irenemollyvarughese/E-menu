@@ -21,6 +21,29 @@
       font-weight: bold;
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     }
+
+    /* High-contrast AI Tags */
+    .item-tags {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-height: 22px;
+    }
+    /* Use Bootstrap badges for strong contrast on dark backgrounds */
+    .item-tag-badge.badge {
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: .4rem .6rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      letter-spacing: .2px;
+      box-shadow: 0 1px 2px rgba(0,0,0,.2);
+    }
+    /* Optional: tighten spacing inside cards so tags breathe a bit */
+    .menu-item-card .item-desc { margin-bottom: .25rem; }
+    .menu-item-card .item-price { margin-top: .25rem; }
   </style>
 </head>
 <body>
@@ -36,7 +59,9 @@
   <!-- Category Buttons -->
   <div class="d-flex justify-content-center gap-2 my-3 flex-wrap">
     {% for category in categories %}
-      <button class="category-btn {% if forloop.first %}btn-primary active{% endif %}" onclick="showCategory('{{ category.id }}')" id="btn-category-{{ category.id }}">
+      <button class="category-btn {% if forloop.first %}btn-primary active{% endif %}"
+              onclick="showCategory('{{ category.id }}')"
+              id="btn-category-{{ category.id }}">
         {{ category.name }}
       </button>
     {% endfor %}
@@ -50,10 +75,21 @@
         {% for item in category.menuitem_set.all %}
           {% if item.available %}
             <div class="col-12">
-              <div class="menu-item-card d-flex align-items-center p-3 mb-3">
+              <div
+                class="menu-item-card d-flex align-items-center p-3 mb-3"
+                data-item-id="{{ item.id }}"
+                data-item-name="{{ item.name|escapejs }}"
+                data-item-category="{{ category.name|escapejs }}"
+              >
                 <div class="flex-grow-1">
                   <div class="item-title">{{ item.name }}</div>
                   <div class="item-desc">{{ item.description }}</div>
+
+                  <!-- AI Tags container -->
+                  <div class="item-tags" id="tags-{{ item.id }}">
+                    <span class="text-secondary small">Loading tags…</span>
+                  </div>
+
                   <div class="item-price">Rs.{{ item.price }}</div>
                 </div>
                 <div class="d-flex flex-column align-items-center ms-3">
@@ -84,14 +120,24 @@
 <!-- Cart Notification Band -->
 <div id="cart-band" class="cart-band">
   <span id="cart-band-msg"></span>
-  <a href="{% url 'view_cart' qr_code %}" id="view-cart-link" class="btn btn-light btn-sm ms-3">View Cart &gt;</a>
+  {% if table_code %}
+    <a href="{% url 'view_cart_table' qr_code table_code %}" id="view-cart-link" class="btn btn-light btn-sm ms-3">View Cart &gt;</a>
+  {% else %}
+    <a href="{% url 'view_cart' qr_code %}" id="view-cart-link" class="btn btn-light btn-sm ms-3">View Cart &gt;</a>
+  {% endif %}
 </div>
 
 <!-- 🚚 Fixed Track Order Button (Bottom Right) -->
 {% if order_id %}
-  <a href="{% url 'track_order' qr_code=qr_code order_id=order_id %}" class="btn btn-warning track-order-btn">
-    🚚 Track Order
-  </a>
+  {% if table_code %}
+    <a href="{% url 'track_order_table' qr_code table_code order_id %}" class="btn btn-warning track-order-btn">
+      🚚 Track Order
+    </a>
+  {% else %}
+    <a href="{% url 'track_order' qr_code=qr_code order_id=order_id %}" class="btn btn-warning track-order-btn">
+      🚚 Track Order
+    </a>
+  {% endif %}
 {% endif %}
 
 <script>
@@ -104,6 +150,9 @@ function showCategory(categoryId) {
     btn.classList.remove('btn-primary', 'active');
   });
   document.getElementById('btn-category-' + categoryId).classList.add('btn-primary', 'active');
+
+  // Load AI tags for items in the newly active category (only once per item)
+  loadTagsForCategory(categoryId);
 }
 
 function updateCartControls(itemId, quantity) {
@@ -132,6 +181,71 @@ function updateCartBand(count) {
 }
 
 var qr_code = "{{ qr_code }}";
+var table_code = "{{ table_code|default:'' }}";
+var aiTagsUrl = "{% url 'generate_ai_tags' %}";
+
+function baseMenuUrl() {
+  // Works for both hotel-only and table URLs
+  return '/menu/' + qr_code + (table_code ? '/' + table_code : '');
+}
+
+// Safely escape text content
+function escapeHtml(text) {
+  return $('<div>').text(text == null ? '' : String(text)).html();
+}
+
+// Decide badge color class based on tag name
+function tagClassByName(name) {
+  const s = (name || '').toLowerCase();
+  if (s.includes('vegan') || s === 'veg' || s.includes('veg')) return 'text-bg-success';
+  if (s.includes('spicy') || s.includes('non-veg') || s.includes('non veg')) return 'text-bg-danger';
+  if (s.includes('drink') || s.includes('juice') || s.includes('beverage') || s.includes('cool')) return 'text-bg-info';
+  if (s.includes('kid')) return 'text-bg-warning';
+  return 'text-bg-secondary';
+}
+
+function renderTags($container, tags) {
+  if (!Array.isArray(tags) || tags.length === 0) {
+    $container.empty();
+    return;
+  }
+  const html = tags.map(t => {
+    const emoji = t.emoji || '';
+    const name = t.name || '';
+    const cls = tagClassByName(name);
+    return `<span class="badge rounded-pill ${cls} item-tag-badge" title="${escapeHtml(name)}">${escapeHtml(emoji)} ${escapeHtml(name)}</span>`;
+  }).join(' ');
+  $container.html(html);
+}
+
+function fetchTags(itemId, name, category) {
+  const $container = $('#tags-' + itemId);
+  $.post(aiTagsUrl, {
+    csrfmiddlewaretoken: '{{ csrf_token }}',
+    name: name,
+    category: category
+  })
+  .done(function(res) {
+    renderTags($container, res.tags || []);
+  })
+  .fail(function() {
+    $container.empty();
+  });
+}
+
+function loadTagsForCategory(categoryId) {
+  $('#category-' + categoryId + ' .menu-item-card').each(function() {
+    const $card = $(this);
+    if ($card.data('tagsLoaded')) return; // Only load once per item
+    $card.data('tagsLoaded', true);
+
+    const itemId = $card.data('item-id');
+    const name = $card.data('item-name');
+    const categoryName = $card.data('item-category');
+
+    fetchTags(itemId, name, categoryName);
+  });
+}
 
 $(document).ready(function() {
   var initialCount = 0;
@@ -139,11 +253,18 @@ $(document).ready(function() {
     initialCount += {{ v }};
   {% endfor %}
   updateCartBand(initialCount);
+
+  // Load tags for initially active category
+  const activeSection = document.querySelector('.category-section.active');
+  if (activeSection) {
+    const activeCategoryId = activeSection.id.replace('category-', '');
+    loadTagsForCategory(activeCategoryId);
+  }
 });
 
 $(document).on('click', '.add-btn, .plus-btn', function() {
   const itemId = $(this).data('id');
-  $.post('/menu/' + qr_code + '/add-to-cart/' + itemId + '/', {
+  $.post(baseMenuUrl() + '/add-to-cart/' + itemId + '/', {
     csrfmiddlewaretoken: '{{ csrf_token }}'
   }, function(data) {
     updateCartControls(itemId, data.item_quantity);
@@ -153,7 +274,7 @@ $(document).on('click', '.add-btn, .plus-btn', function() {
 
 $(document).on('click', '.minus-btn', function() {
   const itemId = $(this).data('id');
-  $.post('/menu/' + qr_code + '/remove-from-cart/' + itemId + '/', {
+  $.post(baseMenuUrl() + '/remove-from-cart/' + itemId + '/', {
     csrfmiddlewaretoken: '{{ csrf_token }}'
   }, function(data) {
     updateCartControls(itemId, data.item_quantity);
