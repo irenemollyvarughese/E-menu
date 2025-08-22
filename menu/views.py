@@ -375,35 +375,133 @@ def update_order_status(request, order_id):
 # ADMIN LOGIN & DASHBOARD
 # -----------------------------
 
+
+# views.py
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from .models import Hotel
+
+import uuid
+
+def hotel_register(request):
+    if request.method == "POST":
+        name = request.POST.get("name")
+        username = request.POST.get("username")
+        password = request.POST.get("password")
+        location = request.POST.get("location")
+        qr_code = request.POST.get("qr_code") or str(uuid.uuid4())[:8]  # auto-generate if not provided
+        phone = request.POST.get("phone")
+        start_time = request.POST.get("start_time") or None
+        end_time = request.POST.get("end_time") or None
+        wifi_name = request.POST.get("wifi_name")
+        wifi_password = request.POST.get("wifi_password")
+        instagram = request.POST.get("instagram")
+        facebook = request.POST.get("facebook")
+        hotel_image = request.FILES.get("hotel_image")
+
+        # Check username uniqueness
+        if Hotel.objects.filter(username=username).exists():
+            messages.error(request, "Username already exists!")
+            return redirect("hotel_register")
+
+        # Check QR code uniqueness
+        if Hotel.objects.filter(qr_code=qr_code).exists():
+            messages.error(request, "QR Code already exists! Use a different one.")
+            return redirect("hotel_register")
+
+        # Create and save hotel
+        hotel = Hotel(
+            name=name,
+            username=username,
+            password=password,  # hash password
+            location=location,
+            qr_code=qr_code,
+            phone=phone,
+            start_time=start_time,
+            end_time=end_time,
+            wifi_name=wifi_name,
+            wifi_password=wifi_password,
+            instagram=instagram,
+            facebook=facebook,
+            hotel_image=hotel_image
+        )
+        hotel.save()
+        messages.success(request, "Hotel registered successfully! Please login.")
+        return redirect("admin_login")
+
+    return render(request, "menu/register.html")
+
+
+
+
+
 def admin_login(request):
-    if request.user.is_authenticated:
-        return redirect('admin_dashboard')
-    if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
-        user = authenticate(request, username=username, password=password)
-        if user is not None and user.is_staff:
-            login(request, user)
-            return redirect('admin_dashboard')
-        else:
-            messages.error(request, "Invalid credentials or not an admin user.")
-    return render(request, 'menu/admin_login.html')
+    if request.method == "POST":
+        username = request.POST.get("username")
+        password = request.POST.get("password")
+
+        try:
+            hotel = Hotel.objects.get(username=username)
+            if hotel.password == password:  # check raw password
+                request.session['hotel_id'] = hotel.id
+                return redirect("admin_dashboard")
+            else:
+                messages.error(request, "Incorrect password!")
+        except Hotel.DoesNotExist:
+            messages.error(request, "Username not found!")
+
+        return redirect("admin_login")
+
+    return render(request, "menu/admin_login.html")
 
 
 def admin_logout(request):
-    logout(request)
-    return redirect('admin_login')
+    if "hotel_id" in request.session:
+        del request.session["hotel_id"]
+    messages.success(request, "Logged out successfully")
+    return redirect("admin_login")
+
+
 
 
 def admin_dashboard(request):
-    return render(request, 'menu/admin_dashboard.html')
-
+    hotel_id = request.session.get('hotel_id')
+    if not hotel_id:
+        return redirect('admin_login')
+    
+    hotel = Hotel.objects.get(id=hotel_id)
+    return render(request, 'menu/admin_dashboard.html', {'hotel': hotel})
 
 @login_required
 def admin_settings(request):
     return render(request, 'menu/admin_settings.html')
 
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from .models import Hotel
 
+from .forms import HotelUpdateForm
+
+
+# Hotel Settings / Details Page
+
+def hotel_settings(request, hotel_id):
+    hotel = get_object_or_404(Hotel, id=hotel_id)
+    return render(request, "menu/settings.html", {"hotel": hotel})
+
+def hotel_update(request, pk):
+    hotel = get_object_or_404(Hotel, pk=pk)
+    form = HotelUpdateForm(instance=hotel)
+
+    if request.method == 'POST':
+        form = HotelUpdateForm(request.POST, request.FILES, instance=hotel)
+        if form.is_valid():
+            if form.cleaned_data.get('password'):
+                hotel.password = form.cleaned_data['password']
+            form.save()
+            return redirect('hotel_settings', hotel_id=hotel.pk)
+
+    return render(request, 'menu/hotel_update.html', {'form': form, 'hotel': hotel})
 # -----------------------------
 # MENU ITEM MGMT
 # -----------------------------

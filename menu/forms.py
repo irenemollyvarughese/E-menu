@@ -30,3 +30,18 @@ class CategoryForm(forms.ModelForm):
                 'rows': 3
             }),
         }
+
+
+from django import forms
+from .models import Hotel
+
+class HotelUpdateForm(forms.ModelForm):
+    
+
+    class Meta:
+        model = Hotel
+        fields = [
+            'name', 'location', 'qr_code', 'start_time', 'end_time',
+            'password', 'phone', 'wifi_name', 'wifi_password',
+            'instagram', 'facebook', 'hotel_image'
+        ]

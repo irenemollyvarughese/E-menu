@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     # Staff/Admin (specific, keep first)
     path('staff/login/', views.admin_login, name='admin_login'),
+    path('staff/register/', views.hotel_register, name='hotel_register'),
     path('staff/logout/', views.admin_logout, name='admin_logout'),
     path('staff/dashboard/', views.admin_dashboard, name='admin_dashboard'),
     path('staff/orders/', views.staff_orders, name='staff_orders'),
@@ -54,4 +55,12 @@ urlpatterns = [
     # Generic login routes LAST (catch-alls)
     path('<str:qr_code>/<slug:table_code>/', views.mobile_login, name='mobile_login_table'),
     path('<str:qr_code>/', views.mobile_login, name='mobile_login'),
+
+
+
+    # new
+
+    path('staff/settings/<int:hotel_id>/', views.hotel_settings, name='hotel_settings'),
+    path('staff/<int:pk>/update/', views.hotel_update, name='hotel_update'),
+
 ]

@@ -8,29 +8,34 @@ import qrcode
 # -----------------------------
 # Hotel (unchanged, generates a "hotel landing" QR)
 # -----------------------------
+
+
 class Hotel(models.Model):
     name = models.CharField(max_length=100)
     location = models.TextField()
     qr_code = models.CharField(max_length=20, unique=True)
-    qr_image = models.ImageField(upload_to='qr_codes/', blank=True, null=True)
+   
+    username = models.CharField(max_length=150, unique=True, null=True, blank=True)
+    
+    password = models.CharField(max_length=128, null=True, blank=True)  # store raw password (not secure, better to hash)
+    phone = models.CharField(max_length=15,null=True, blank=True)
+   
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
+
+    wifi_name = models.CharField(max_length=100, blank=True, null=True)
+    wifi_password = models.CharField(max_length=100, blank=True, null=True)
+    instagram = models.CharField(max_length=100, blank=True, null=True)
+    facebook = models.CharField(max_length=100, blank=True, null=True)
+
+
     hotel_image = models.ImageField(upload_to='hotel_images/', blank=True, null=True)
+
+
 
     def __str__(self):
         return self.name
 
-    def _base_url(self):
-        # Set PUBLIC_BASE_URL in settings for prod (e.g., https://yourdomain.com)
-        return getattr(settings, "PUBLIC_BASE_URL", "http://127.0.0.1:8000")
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        # Generate/refresh the hotel-level QR (optional, keeps your original behavior)
-        url = f"{self._base_url()}/menu/{self.qr_code}/"
-        img = qrcode.make(url)
-        stream = BytesIO()
-        img.save(stream, format='PNG')
-        self.qr_image.save(f'{self.qr_code}.png', File(stream), save=False)
-        super().save(update_fields=['qr_image'])
 
 
 # -----------------------------

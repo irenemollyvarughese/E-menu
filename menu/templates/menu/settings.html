@@ -1,0 +1,200 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ hotel.name }} - Hotel Details</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Bootstrap & Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+
+    <style>
+        body {
+            background: linear-gradient(to right, #000000, #0a0b0c, #080909);
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            scroll-behavior: smooth;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 50px auto;
+        }
+
+        .hotel-card {
+            background: rgba(0,0,0,0.75);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.85);
+        }
+
+        .hotel-header {
+            display: flex;
+            justify-content: center; /* center the name */
+            align-items: flex-start;
+            flex-wrap: wrap;
+            position: relative;
+            margin-bottom: 30px;
+        }
+
+        .hotel-header .title {
+            text-align: center;
+            z-index: 1;
+        }
+
+        .hotel-header h1 {
+            color: #ffd700;
+            font-weight: 700;
+            font-size: 2.2rem;
+            margin-bottom: 5px;
+        }
+
+        .hotel-header p {
+            font-size: 1rem;
+            color: #ccc;
+        }
+
+        .hotel-image {
+            max-width: 200px;
+            max-height: 150px;
+            border-radius: 15px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.7);
+            position: absolute;
+            top: 0;
+            right: 0;
+        }
+
+        .hotel-body {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .hotel-content {
+            flex: 2;
+            min-width: 300px;
+        }
+
+        .tab-section {
+            margin-bottom: 2rem;
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+        }
+
+        .tab-section p {
+            margin-bottom: 12px;
+            font-size: 1rem;
+        }
+
+        .tab-section label {
+            font-weight: 600;
+            color: #25c9a3;
+        }
+
+        .update-btn {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .hotel-body {
+                flex-direction: column;
+            }
+            .hotel-header {
+                justify-content: center;
+                text-align: center;
+            }
+            .hotel-image {
+                position: static;
+                margin-top: 15px;
+                display: block;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .update-btn {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="hotel-card">
+        <!-- Header with Centered Name and Top-Right Image -->
+        <div class="hotel-header">
+            <div class="title">
+                <h1><i class="bi bi-building"></i> {{ hotel.name }}</h1>
+                <p>Complete Hotel Overview</p>
+            </div>
+
+            {% if hotel.hotel_image %}
+            <img src="{{ hotel.hotel_image.url }}" class="hotel-image" alt="Hotel Image">
+            {% endif %}
+        </div>
+
+        <!-- Body -->
+        <div class="hotel-body">
+            <div class="hotel-content">
+
+                <!-- General Section -->
+                <div id="general" class="tab-section">
+                    <h4>General Information</h4>
+                    <p><label>Location:</label> {{ hotel.location|default:"Not provided" }}</p>
+                    <p><label>QR Code:</label> {{ hotel.qr_code }}</p>
+                    <p><label>Working Hours:</label>
+                        {% if hotel.start_time and hotel.end_time %}
+                            {{ hotel.start_time }} - {{ hotel.end_time }}
+                        {% else %}
+                            Not set
+                        {% endif %}
+                    </p>
+                    <p><label>Password:</label> ****** (hidden)</p>
+                </div>
+
+                <!-- Contact Section -->
+                <div id="contact" class="tab-section">
+                    <h4>Contact Details</h4>
+                    <p><i class="bi bi-telephone-fill"></i> <label>Phone:</label> {{ hotel.phone|default:"Not provided" }}</p>
+                    
+                    <p><i class="bi bi-wifi"></i><label>WiFi:</label></p>
+                    <p><label>WiFi Name:</label>
+                        {% if hotel.wifi_name %}
+                            {{ hotel.wifi_name }}
+                        {% else %}
+                            Not set
+                        {% endif %}
+                    </p>
+                    <p><label>Password:</label>
+                        {% if hotel.wifi_password %}
+                            {{ hotel.wifi_password }}
+                        {% else %}
+                            Not set
+                        {% endif %}
+                    </p>
+                </div>
+
+                <!-- Social Section -->
+                <div id="social" class="tab-section">
+                    <h4>Social Media</h4>
+                    <p><i class="bi bi-instagram"></i> <label>Instagram:</label> {{ hotel.instagram|default:"Not provided" }}</p>
+                    <p><i class="bi bi-facebook"></i> <label>Facebook:</label> {{ hotel.facebook|default:"Not provided" }}</p>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Update Button on Right -->
+        <div class="update-btn">
+            <a href="{% url 'hotel_update' hotel.pk %}" class="btn btn-primary">Update Hotel Info</a>
+        </div>
+
+    </div>
+</div>
+
+</body>
+</html>

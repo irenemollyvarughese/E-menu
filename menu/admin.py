@@ -42,21 +42,31 @@ class OrderItemInline(admin.TabularInline):
 
 # ---------------- Admin classes ----------------
 
+
 @admin.register(Hotel)
 class HotelAdmin(admin.ModelAdmin):
-    list_display = ['name', 'location', 'qr_code', 'qr_preview']
-    search_fields = ['name', 'location', 'qr_code']
-    readonly_fields = ('qr_preview', 'qr_image')
-    inlines = [CategoryInline, DiningTableInline]
+    list_display = (
+        "name",
+        "location",
+        "qr_code",
+        "phone",
+        "password",
+        "username",
+        "start_time",
+        "end_time",
+        "preview_image",
+    )
+    list_filter = ("start_time", "end_time",)
+    search_fields = ("name", "location","phone", "username", "qr_code")
+    ordering = ("name",)
 
-    def qr_preview(self, obj):
-        if obj.qr_image:
-            return format_html(
-                '<img src="{}" width="100" height="100" style="object-fit:cover;border-radius:8px;border:1px solid #eee;" />',
-                obj.qr_image.url
-            )
-        return "(No QR yet)"
-    qr_preview.short_description = 'Hotel QR'
+    # show image preview in admin list
+    def preview_image(self, obj):
+        if obj.hotel_image:
+            return format_html('<img src="{}" width="60" height="40" style="object-fit:cover;"/>', obj.hotel_image.url)
+        return "No Image"
+    preview_image.short_description = "Hotel Image"
+
 
 
 @admin.register(DiningTable)

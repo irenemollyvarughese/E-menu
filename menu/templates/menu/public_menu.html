@@ -11,6 +11,26 @@
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
   <style>
+    /* Hotel Header */
+    .hotel-header {
+      background-color: #000;
+      color: #fff;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      text-align: center;
+    }
+    .hotel-header a { color: #fff; text-decoration: none; }
+    .hotel-header a:hover { text-decoration: underline; }
+
+    /* Circular Hotel Image */
+    .hotel-header img.rounded-circle {
+      width: 120px;
+      height: 120px;
+      object-fit: cover;
+      border: 2px solid #fff;
+    }
+
+    /* Track order button */
     .track-order-btn {
       position: fixed;
       bottom: 20px;
@@ -19,42 +39,59 @@
       border-radius: 30px;
       padding: 10px 20px;
       font-weight: bold;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
     }
 
-    /* High-contrast AI Tags */
-    .item-tags {
-      margin-top: 8px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      min-height: 22px;
-    }
-    /* Use Bootstrap badges for strong contrast on dark backgrounds */
+    /* AI Tags */
+    .item-tags { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; min-height: 22px; }
     .item-tag-badge.badge {
-      font-size: 0.82rem;
-      font-weight: 600;
-      padding: .4rem .6rem;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      letter-spacing: .2px;
-      box-shadow: 0 1px 2px rgba(0,0,0,.2);
+      font-size: 0.82rem; font-weight: 600; padding: .4rem .6rem;
+      display: inline-flex; align-items: center; gap: 6px;
+      letter-spacing: .2px; box-shadow: 0 1px 2px rgba(0,0,0,.2);
     }
-    /* Optional: tighten spacing inside cards so tags breathe a bit */
     .menu-item-card .item-desc { margin-bottom: .25rem; }
     .menu-item-card .item-price { margin-top: .25rem; }
+
+    /* Cart Band */
+    .cart-band { position: fixed; bottom: 0; left: 0; width: 100%; background: #ffc; padding: 0.5rem 1rem; display: none; align-items: center; justify-content: center; gap: 1rem; z-index: 1040; border-top: 1px solid #ddd; }
+    .cart-band.show { display: flex; }
   </style>
 </head>
 <body>
 
 <div class="container py-3">
 
-  {% if hotel.qr_image %}
-    <img src="{% static 'menu/food.png' %}" class="brand-img" alt="Restaurant Logo">
-  {% endif %}
-  <div class="hotel-title">{{ hotel.name }}</div>
-  <div class="hotel-location">{{ hotel.location }}</div>
+  <!-- Hotel Header -->
+  <div class="hotel-header shadow-sm rounded">
+      {% if hotel.hotel_image %}
+          <img src="{{ hotel.hotel_image.url }}" alt="{{ hotel.name }}" class="rounded-circle mx-auto d-block mb-2">
+      {% endif %}
+      <div class="hotel-title h4 fw-bold mb-1">{{ hotel.name }}</div>
+      {% if hotel.location %}
+          <div class="hotel-location small mb-2">{{ hotel.location }}</div>
+      {% endif %}
+
+      <!-- Contact Info & Socials -->
+      <div class="d-flex justify-content-center gap-3 flex-wrap align-items-center">
+          {% if hotel.phone %}
+              <a href="tel:{{ hotel.phone }}">📞 {{ hotel.phone }}</a>
+          {% endif %}
+          {% if hotel.instagram %}
+              <a href="{{ hotel.instagram }}" target="_blank">📸 {{ hotel.instagram|cut:"https://www.instagram.com/" }}</a>
+          {% endif %}
+          {% if hotel.facebook %}
+              <a href="{{ hotel.facebook }}" target="_blank">👍 Facebook</a>
+          {% endif %}
+          {% if hotel.wifi_name %}
+              <span>📶 {{ hotel.wifi_name }}
+                  {% if hotel.wifi_password %}
+                      (<span id="wifi-pass">******</span>)
+                      <button type="button" class="btn btn-sm btn-outline-light ms-1" onclick="toggleWifiPassword()">Show</button>
+                  {% endif %}
+              </span>
+          {% endif %}
+      </div>
+  </div>
 
   <!-- Category Buttons -->
   <div class="d-flex justify-content-center gap-2 my-3 flex-wrap">
@@ -75,26 +112,21 @@
         {% for item in category.menuitem_set.all %}
           {% if item.available %}
             <div class="col-12">
-              <div
-                class="menu-item-card d-flex align-items-center p-3 mb-3"
-                data-item-id="{{ item.id }}"
-                data-item-name="{{ item.name|escapejs }}"
-                data-item-category="{{ category.name|escapejs }}"
-              >
+              <div class="menu-item-card d-flex align-items-center p-3 mb-3"
+                   data-item-id="{{ item.id }}"
+                   data-item-name="{{ item.name|escapejs }}"
+                   data-item-category="{{ category.name|escapejs }}">
                 <div class="flex-grow-1">
                   <div class="item-title">{{ item.name }}</div>
                   <div class="item-desc">{{ item.description }}</div>
-
-                  <!-- AI Tags container -->
                   <div class="item-tags" id="tags-{{ item.id }}">
                     <span class="text-secondary small">Loading tags…</span>
                   </div>
-
                   <div class="item-price">Rs.{{ item.price }}</div>
                 </div>
                 <div class="d-flex flex-column align-items-center ms-3">
                   {% if item.image %}
-                    <img src="{{ item.image.url }}" alt="{{ item.name }}" class="item-img">
+                    <img src="{{ item.image.url }}" alt="{{ item.name }}" class="item-img" style="width:80px;height:80px;object-fit:cover;border-radius:0.25rem;">
                   {% endif %}
                   <div id="cart-controls-{{ item.id }}" class="mt-2">
                     {% if cart_items|get_item:item.id %}
@@ -127,7 +159,7 @@
   {% endif %}
 </div>
 
-<!-- 🚚 Fixed Track Order Button (Bottom Right) -->
+<!-- Track Order Button -->
 {% if order_id %}
   {% if table_code %}
     <a href="{% url 'track_order_table' qr_code table_code order_id %}" class="btn btn-warning track-order-btn">
@@ -141,152 +173,63 @@
 {% endif %}
 
 <script>
-function showCategory(categoryId) {
-  document.querySelectorAll('.category-section').forEach(function(section) {
-    section.classList.remove('active');
-  });
-  document.getElementById('category-' + categoryId).classList.add('active');
-  document.querySelectorAll('.category-btn').forEach(function(btn) {
-    btn.classList.remove('btn-primary', 'active');
-  });
-  document.getElementById('btn-category-' + categoryId).classList.add('btn-primary', 'active');
+// Wifi password toggle
+function toggleWifiPassword() {
+    const passSpan = document.getElementById('wifi-pass');
+    if(passSpan.innerText==='******') {
+        passSpan.innerText='{{ hotel.wifi_password }}';
+    } else { passSpan.innerText='******'; }
+}
 
-  // Load AI tags for items in the newly active category (only once per item)
+// Category switch
+function showCategory(categoryId){
+  document.querySelectorAll('.category-section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('category-'+categoryId).classList.add('active');
+  document.querySelectorAll('.category-btn').forEach(b=>b.classList.remove('btn-primary','active'));
+  document.getElementById('btn-category-'+categoryId).classList.add('btn-primary','active');
   loadTagsForCategory(categoryId);
 }
 
-function updateCartControls(itemId, quantity) {
-  let controls = '';
-  if (quantity > 0) {
-    controls = `
-      <div class="input-group input-group-sm">
-        <button class="btn btn-outline-secondary minus-btn" data-id="${itemId}">-</button>
-        <span class="input-group-text">${quantity}</span>
-        <button class="btn btn-outline-secondary plus-btn" data-id="${itemId}">+</button>
-      </div>
-    `;
-  } else {
-    controls = `<button class="btn add-btn btn-sm mt-1" data-id="${itemId}">Add</button>`;
-  }
+// Cart functions
+function updateCartControls(itemId,quantity){
+  let controls = quantity>0 ? 
+    `<div class="input-group input-group-sm">
+      <button class="btn btn-outline-secondary minus-btn" data-id="${itemId}">-</button>
+      <span class="input-group-text">${quantity}</span>
+      <button class="btn btn-outline-secondary plus-btn" data-id="${itemId}">+</button>
+    </div>` : `<button class="btn add-btn btn-sm mt-1" data-id="${itemId}">Add</button>`;
   $(`#cart-controls-${itemId}`).html(controls);
 }
-
-function updateCartBand(count) {
-  if (count > 0) {
-    $('#cart-band-msg').text(`${count} item${count > 1 ? 's' : ''} in cart`);
-    $('#cart-band').addClass('show');
-  } else {
-    $('#cart-band').removeClass('show');
-  }
+function updateCartBand(count){
+  if(count>0){ $('#cart-band-msg').text(`${count} item${count>1?'s':''} in cart`).addClass('show'); $('#cart-band').addClass('show'); }
+  else { $('#cart-band').removeClass('show'); }
 }
 
-var qr_code = "{{ qr_code }}";
-var table_code = "{{ table_code|default:'' }}";
-var aiTagsUrl = "{% url 'generate_ai_tags' %}";
+// AI Tags
+var qr_code="{{ qr_code }}";
+var table_code="{{ table_code|default:'' }}";
+var aiTagsUrl="{% url 'generate_ai_tags' %}";
+function baseMenuUrl(){ return '/menu/'+qr_code+(table_code?'/'+table_code:''); }
+function escapeHtml(text){ return $('<div>').text(text||'').html(); }
+function tagClassByName(name){ const s=(name||'').toLowerCase(); if(s.includes('vegan')||s.includes('veg')) return 'text-bg-success'; if(s.includes('spicy')||s.includes('non-veg')||s.includes('non veg')) return 'text-bg-danger'; if(s.includes('drink')||s.includes('juice')||s.includes('beverage')) return 'text-bg-info'; if(s.includes('kid')) return 'text-bg-warning'; return 'text-bg-secondary'; }
+function renderTags($container,tags){ if(!Array.isArray(tags)||tags.length===0){$container.empty();return;} const html=tags.map(t=>{ const emoji=t.emoji||''; const name=t.name||''; const cls=tagClassByName(name); return `<span class="badge rounded-pill ${cls} item-tag-badge" title="${escapeHtml(name)}">${escapeHtml(emoji)} ${escapeHtml(name)}</span>`; }).join(' '); $container.html(html); }
+function fetchTags(itemId,name,category){ const $container=$('#tags-'+itemId); $.post(aiTagsUrl,{csrfmiddlewaretoken:'{{ csrf_token }}',name:name,category:category}).done(res=>renderTags($container,res.tags||[])).fail(()=>{$container.empty();}); }
+function loadTagsForCategory(categoryId){ $('#category-'+categoryId+' .menu-item-card').each(function(){ const $card=$(this); if($card.data('tagsLoaded')) return; $card.data('tagsLoaded',true); fetchTags($card.data('item-id'),$card.data('item-name'),$card.data('item-category')); }); }
 
-function baseMenuUrl() {
-  // Works for both hotel-only and table URLs
-  return '/menu/' + qr_code + (table_code ? '/' + table_code : '');
-}
-
-// Safely escape text content
-function escapeHtml(text) {
-  return $('<div>').text(text == null ? '' : String(text)).html();
-}
-
-// Decide badge color class based on tag name
-function tagClassByName(name) {
-  const s = (name || '').toLowerCase();
-  if (s.includes('vegan') || s === 'veg' || s.includes('veg')) return 'text-bg-success';
-  if (s.includes('spicy') || s.includes('non-veg') || s.includes('non veg')) return 'text-bg-danger';
-  if (s.includes('drink') || s.includes('juice') || s.includes('beverage') || s.includes('cool')) return 'text-bg-info';
-  if (s.includes('kid')) return 'text-bg-warning';
-  return 'text-bg-secondary';
-}
-
-function renderTags($container, tags) {
-  if (!Array.isArray(tags) || tags.length === 0) {
-    $container.empty();
-    return;
-  }
-  const html = tags.map(t => {
-    const emoji = t.emoji || '';
-    const name = t.name || '';
-    const cls = tagClassByName(name);
-    return `<span class="badge rounded-pill ${cls} item-tag-badge" title="${escapeHtml(name)}">${escapeHtml(emoji)} ${escapeHtml(name)}</span>`;
-  }).join(' ');
-  $container.html(html);
-}
-
-function fetchTags(itemId, name, category) {
-  const $container = $('#tags-' + itemId);
-  $.post(aiTagsUrl, {
-    csrfmiddlewaretoken: '{{ csrf_token }}',
-    name: name,
-    category: category
-  })
-  .done(function(res) {
-    renderTags($container, res.tags || []);
-  })
-  .fail(function() {
-    $container.empty();
-  });
-}
-
-function loadTagsForCategory(categoryId) {
-  $('#category-' + categoryId + ' .menu-item-card').each(function() {
-    const $card = $(this);
-    if ($card.data('tagsLoaded')) return; // Only load once per item
-    $card.data('tagsLoaded', true);
-
-    const itemId = $card.data('item-id');
-    const name = $card.data('item-name');
-    const categoryName = $card.data('item-category');
-
-    fetchTags(itemId, name, categoryName);
-  });
-}
-
-$(document).ready(function() {
-  var initialCount = 0;
-  {% for k, v in cart_items.items %}
-    initialCount += {{ v }};
-  {% endfor %}
+// Initialize
+$(document).ready(function(){
+  var initialCount=0;
+  {% for k,v in cart_items.items %} initialCount+= {{ v }}; {% endfor %}
   updateCartBand(initialCount);
-
-  // Load tags for initially active category
-  const activeSection = document.querySelector('.category-section.active');
-  if (activeSection) {
-    const activeCategoryId = activeSection.id.replace('category-', '');
-    loadTagsForCategory(activeCategoryId);
-  }
+  const activeSection=document.querySelector('.category-section.active');
+  if(activeSection) loadTagsForCategory(activeSection.id.replace('category-',''));
 });
 
-$(document).on('click', '.add-btn, .plus-btn', function() {
-  const itemId = $(this).data('id');
-  $.post(baseMenuUrl() + '/add-to-cart/' + itemId + '/', {
-    csrfmiddlewaretoken: '{{ csrf_token }}'
-  }, function(data) {
-    updateCartControls(itemId, data.item_quantity);
-    updateCartBand(data.cart_count);
-  });
-});
+// Add/Remove Cart
+$(document).on('click','.add-btn,.plus-btn',function(){ const itemId=$(this).data('id'); $.post(baseMenuUrl()+'/add-to-cart/'+itemId+'/',{csrfmiddlewaretoken:'{{ csrf_token }}'},function(data){ updateCartControls(itemId,data.item_quantity); updateCartBand(data.cart_count); }); });
+$(document).on('click','.minus-btn',function(){ const itemId=$(this).data('id'); $.post(baseMenuUrl()+'/remove-from-cart/'+itemId+'/',{csrfmiddlewaretoken:'{{ csrf_token }}'},function(data){ updateCartControls(itemId,data.item_quantity); updateCartBand(data.cart_count); }); });
 
-$(document).on('click', '.minus-btn', function() {
-  const itemId = $(this).data('id');
-  $.post(baseMenuUrl() + '/remove-from-cart/' + itemId + '/', {
-    csrfmiddlewaretoken: '{{ csrf_token }}'
-  }, function(data) {
-    updateCartControls(itemId, data.item_quantity);
-    updateCartBand(data.cart_count);
-  });
-});
-
-$('#cart-band').on('click', function(e) {
-  if (!$(e.target).is('#view-cart-link')) {
-    window.location.href = $('#view-cart-link').attr('href');
-  }
-});
+$('#cart-band').on('click',function(e){ if(!$(e.target).is('#view-cart-link')) window.location.href=$('#view-cart-link').attr('href'); });
 </script>
 
 </body>

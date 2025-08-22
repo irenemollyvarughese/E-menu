@@ -96,7 +96,7 @@
 </head>
 <body>
 <div class="auth-container">
-    <img src="{% static 'menu/food.png' %}" class="food-img mb-3" alt="Food Image">
+     <img src="{{ hotel.hotel_image.url }}" class="brand-img" alt="{{ hotel.name }}">
     <div class="hotel-title">{{ hotel.name }}</div>
     {% if table_code %}
         <div class="table-chip">
